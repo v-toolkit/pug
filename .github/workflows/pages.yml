@@ -2,8 +2,8 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main] # ← set to your default branch (main or master)
-  workflow_dispatch: # lets you trigger it manually from the Actions tab
+    branches: [main] # ← change to master if that's your default branch
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -18,15 +18,19 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout (with submodule for examples)
         uses: actions/checkout@v6
-        # No submodules: reference/ is dev-only and is not published.
+        with:
+          submodules: recursive
 
-      - name: Assemble site (app files only — excludes test/, reference/, etc.)
+      - name: Assemble site (app files)
         run: |
           mkdir -p _site
           cp index.html styles.css .nojekyll _site/
           cp -r data js _site/
+
+      - name: Build examples manifest + copy examples (same-origin)
+        run: node scripts/build-manifest.js --src reference/puf-billing --out _site/examples
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

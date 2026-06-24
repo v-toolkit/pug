@@ -79,7 +79,7 @@ PUG.validate = (function () {
     /* ------------------------------ helpers ------------------------------- */
 
     function isoOf(code) {
-        return PUF_DATA.isoCountryCode ? PUF_DATA.isoCountryCode(code) : (code || "").toUpperCase();
+        return PUG_DATA.isoCountryCode ? PUG_DATA.isoCountryCode(code) : (code || "").toUpperCase();
     }
 
     function firstText(xml, localName) {
@@ -91,7 +91,7 @@ PUG.validate = (function () {
 
     function identifierIssues(countryCode, ids, roleLabel) {
         var out = [];
-        var rules = PUF_DATA.identifierRules ? PUF_DATA.identifierRules[isoOf(countryCode)] : null;
+        var rules = PUG_DATA.identifierRules ? PUG_DATA.identifierRules[isoOf(countryCode)] : null;
         if (!rules || !ids) return out;
         var prefix = roleLabel ? roleLabel + " " : "";
         Object.keys(rules).forEach(function (key) {
@@ -116,7 +116,7 @@ PUG.validate = (function () {
     /* ----------------------------- tax rules ------------------------------ */
 
     function expectedTaxScheme(countryCode) {
-        var defs = (PUF_DATA.getCountryIdentifiers && PUF_DATA.getCountryIdentifiers(countryCode)) || [];
+        var defs = (PUG_DATA.getCountryIdentifiers && PUG_DATA.getCountryIdentifiers(countryCode)) || [];
         for (var i = 0; i < defs.length; i += 1) {
             if ((defs[i].slots || []).indexOf("taxScheme") >= 0) return defs[i].taxScheme || "VAT";
         }
@@ -187,15 +187,15 @@ PUG.validate = (function () {
     function valueIssues(s, countryCode) {
         var out = [];
         var cur = (s.currency || "").trim().toUpperCase();
-        if (cur && PUF_DATA.isCurrency && !PUF_DATA.isCurrency(cur)) {
+        if (cur && PUG_DATA.isCurrency && !PUG_DATA.isCurrency(cur)) {
             out.push("Currency \"" + cur + "\" is not a valid ISO 4217 code.");
         }
         var cat = (s.taxCategory || "S").toUpperCase();
-        if (PUF_DATA.isTaxCategory && !PUF_DATA.isTaxCategory(cat)) {
+        if (PUG_DATA.isTaxCategory && !PUG_DATA.isTaxCategory(cat)) {
             out.push("Tax category \"" + cat + "\" is not a recognised code.");
         }
         var c = isoOf(countryCode);
-        if (c && PUF_DATA.isCountryCode && !PUF_DATA.isCountryCode(c)) {
+        if (c && PUG_DATA.isCountryCode && !PUG_DATA.isCountryCode(c)) {
             out.push("Country code \"" + c + "\" is not a valid ISO 3166-1 code.");
         }
         return out;

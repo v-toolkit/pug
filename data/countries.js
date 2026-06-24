@@ -42,12 +42,12 @@
 window.PUG_DATA = window.PUG_DATA || {};
 
 // Fallback identifiers used when a custom / unlisted country code is entered.
-PUF_DATA.defaultIdentifiers = [
+PUG_DATA.defaultIdentifiers = [
     { key: "vat", label: "VAT / Tax number", hint: "Tax registration identifier", slots: ["taxScheme"], taxScheme: "VAT", example: "VAT number" },
     { key: "legalId", label: "Legal registration ID", hint: "Company / organisation number", slots: ["legalEntityCompanyId"], example: "Company number" }
 ];
 
-PUF_DATA.countries = [
+PUG_DATA.countries = [
     {
         code: "AU", name: "Australia", folder: "australia",
         identifiers: [
@@ -279,46 +279,46 @@ PUF_DATA.countries = [
 ];
 
 // Look-ups (built once).
-PUF_DATA.countriesByCode = PUF_DATA.countries.reduce(function (map, country) {
+PUG_DATA.countriesByCode = PUG_DATA.countries.reduce(function (map, country) {
     // First entry for a code wins for the generic lookup; specific variants
     // (e.g. Basque Country) are still reachable through the full list.
     if (!map[country.code]) map[country.code] = country;
     return map;
 }, {});
 
-PUF_DATA.getCountryIdentifiers = function (code) {
-    var country = PUF_DATA.countriesByCode[(code || "").toUpperCase()];
-    return country ? country.identifiers : PUF_DATA.defaultIdentifiers;
+PUG_DATA.getCountryIdentifiers = function (code) {
+    var country = PUG_DATA.countriesByCode[(code || "").toUpperCase()];
+    return country ? country.identifiers : PUG_DATA.defaultIdentifiers;
 };
 
 // The ISO 3166-1 alpha-2 country code to write into the XML. Usually the same
 // as the lookup code, but variants (e.g. ES-PV Basque Country) map back to ES.
-PUF_DATA.isoCountryCode = function (code) {
-    var c = PUF_DATA.countriesByCode[(code || "").toUpperCase()];
+PUG_DATA.isoCountryCode = function (code) {
+    var c = PUG_DATA.countriesByCode[(code || "").toUpperCase()];
     return (c && c.iso) || (code || "").toUpperCase();
 };
 
 // Default standard VAT/GST rates (%) — starting points the user can override.
 // Verify against current local rates before relying on them.
-PUF_DATA.defaultTaxRates = {
+PUG_DATA.defaultTaxRates = {
     "AT": "20", "AU": "10", "BE": "21", "CH": "8.1", "CN": "13", "CZ": "21",
     "DE": "19", "DK": "25", "ES": "21", "ES-PV": "21", "FI": "25.5", "FR": "20",
     "GB": "20", "IE": "23", "IN": "18", "IT": "22", "JP": "10", "NL": "21",
     "NO": "25", "PL": "23", "PT": "23", "RO": "19", "SA": "15", "SE": "25",
     "SG": "9", "TR": "20", "AE": "5", "US": "0"
 };
-PUF_DATA.defaultTaxRateFor = function (code) {
-    return PUF_DATA.defaultTaxRates[(code || "").toUpperCase()] || "";
+PUG_DATA.defaultTaxRateFor = function (code) {
+    return PUG_DATA.defaultTaxRates[(code || "").toUpperCase()] || "";
 };
 
 // Default document currency per country (falls back to the Settings default).
-PUF_DATA.defaultCurrencies = {
+PUG_DATA.defaultCurrencies = {
     "AU": "AUD", "CH": "CHF", "CN": "CNY", "CZ": "CZK", "DK": "DKK", "GB": "GBP",
     "IN": "INR", "JP": "JPY", "NO": "NOK", "PL": "PLN", "RO": "RON", "SA": "SAR",
     "SE": "SEK", "SG": "SGD", "TR": "TRY", "AE": "AED", "US": "USD"
 };
-PUF_DATA.defaultCurrencyFor = function (code) {
+PUG_DATA.defaultCurrencyFor = function (code) {
     var up = (code || "").toUpperCase();
-    if (PUF_DATA.defaultCurrencies[up]) return PUF_DATA.defaultCurrencies[up];
-    return PUF_DATA.countriesByCode[up] ? "EUR" : "";
+    if (PUG_DATA.defaultCurrencies[up]) return PUG_DATA.defaultCurrencies[up];
+    return PUG_DATA.countriesByCode[up] ? "EUR" : "";
 };

@@ -68,12 +68,12 @@ PUG.import = (function () {
     // Build a set of all identifier keys (normalised, spaces removed) -> key.
     var ID_KEYS = (function () {
         var map = {};
-        (PUF_DATA.countries || []).forEach(function (country) {
+        (PUG_DATA.countries || []).forEach(function (country) {
             (country.identifiers || []).forEach(function (def) {
                 map[def.key.toLowerCase()] = def.key;
             });
         });
-        (PUF_DATA.defaultIdentifiers || []).forEach(function (def) {
+        (PUG_DATA.defaultIdentifiers || []).forEach(function (def) {
             map[def.key.toLowerCase()] = def.key;
         });
         return map;

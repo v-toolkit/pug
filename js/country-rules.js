@@ -23,7 +23,7 @@ window.PUG = window.PUG || {};
 PUG.countryRules = (function () {
 
     function iso(code) {
-        return PUF_DATA.isoCountryCode ? PUF_DATA.isoCountryCode(code) : (code || "").toUpperCase();
+        return PUG_DATA.isoCountryCode ? PUG_DATA.isoCountryCode(code) : (code || "").toUpperCase();
     }
     function has(v) { return !!(v && String(v).trim()); }
 

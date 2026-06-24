@@ -24,7 +24,7 @@ PUG.xml = (function () {
 
     function buildParty(party) {
         party = party || {};
-        var defs = PUF_DATA.getCountryIdentifiers(party.country);
+        var defs = PUG_DATA.getCountryIdentifiers(party.country);
         var ids = party.ids || {};
 
         var endpoints = [];
@@ -162,7 +162,7 @@ PUG.xml = (function () {
 
     function replaceIdentifierTokens(xml, prefix, party) {
         if (!party) return xml;
-        var defs = PUF_DATA.getCountryIdentifiers(party.country);
+        var defs = PUG_DATA.getCountryIdentifiers(party.country);
         var ids = party.ids || {};
         defs.forEach(function (def) {
             var token = "{{" + prefix + "_" + def.key.toUpperCase() + "}}";
@@ -324,9 +324,9 @@ PUG.xml = (function () {
             }
             if (party.name) updated = setPartyNameInBlock(updated, party.name);
             if (party.legalName) updated = setRegistrationNameInBlock(updated, party.legalName);
-            if (party.country) updated = setCountryInBlock(updated, PUF_DATA.isoCountryCode(party.country));
+            if (party.country) updated = setCountryInBlock(updated, PUG_DATA.isoCountryCode(party.country));
 
-            var defs = PUF_DATA.getCountryIdentifiers(party.country);
+            var defs = PUG_DATA.getCountryIdentifiers(party.country);
             var ids = party.ids || {};
             defs.forEach(function (def) {
                 var value = (ids[def.key] || "").trim();
@@ -546,7 +546,7 @@ PUG.xml = (function () {
         }
 
         // Identifiers, matched against this party's country field defs.
-        var defs = PUF_DATA.getCountryIdentifiers(party.country);
+        var defs = PUG_DATA.getCountryIdentifiers(party.country);
         defs.forEach(function (def) {
             party.ids[def.key] = readIdentifier(partyContainer, def);
         });

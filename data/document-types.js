@@ -25,7 +25,7 @@
 
 window.PUG_DATA = window.PUG_DATA || {};
 
-PUF_DATA.documentTypes = [
+PUG_DATA.documentTypes = [
     {
         key: "INVOICE",
         label: "Invoice",
@@ -54,15 +54,15 @@ PUF_DATA.documentTypes = [
     // { key:"DEBIT_NOTE", label:"Debit note", enabled:false, rootElement:"DebitNote", ... }
 ];
 
-PUF_DATA.documentTypesByKey = PUF_DATA.documentTypes.reduce(function (map, type) {
+PUG_DATA.documentTypesByKey = PUG_DATA.documentTypes.reduce(function (map, type) {
     map[type.key] = type;
     return map;
 }, {});
 
-PUF_DATA.getDocumentType = function (key) {
-    return PUF_DATA.documentTypesByKey[key] || PUF_DATA.documentTypesByKey.INVOICE;
+PUG_DATA.getDocumentType = function (key) {
+    return PUG_DATA.documentTypesByKey[key] || PUG_DATA.documentTypesByKey.INVOICE;
 };
 
-PUF_DATA.enabledDocumentTypes = function () {
-    return PUF_DATA.documentTypes.filter(function (type) { return type.enabled; });
+PUG_DATA.enabledDocumentTypes = function () {
+    return PUG_DATA.documentTypes.filter(function (type) { return type.enabled; });
 };

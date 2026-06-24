@@ -63,15 +63,15 @@ window.PUG_DATA = window.PUG_DATA || {};
         return m;
     }
 
-    PUF_DATA.codeLists = {
+    PUG_DATA.codeLists = {
         currencies: CURRENCIES,
         countries: COUNTRIES,
         taxCategories: TAX_CATEGORIES,
         taxSchemes: TAX_SCHEMES
     };
 
-    PUF_DATA.isCurrency = function (code) { return !!currencySet[(code || "").toUpperCase()]; };
-    PUF_DATA.isCountryCode = function (code) { return !!countrySet[(code || "").toUpperCase()]; };
-    PUF_DATA.isTaxScheme = function (code) { return !!schemeSet[(code || "").toUpperCase()]; };
-    PUF_DATA.isTaxCategory = function (code) { return Object.prototype.hasOwnProperty.call(TAX_CATEGORIES, (code || "").toUpperCase()); };
+    PUG_DATA.isCurrency = function (code) { return !!currencySet[(code || "").toUpperCase()]; };
+    PUG_DATA.isCountryCode = function (code) { return !!countrySet[(code || "").toUpperCase()]; };
+    PUG_DATA.isTaxScheme = function (code) { return !!schemeSet[(code || "").toUpperCase()]; };
+    PUG_DATA.isTaxCategory = function (code) { return Object.prototype.hasOwnProperty.call(TAX_CATEGORIES, (code || "").toUpperCase()); };
 })();

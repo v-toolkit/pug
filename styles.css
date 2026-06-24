@@ -561,6 +561,31 @@ code {
     color: var(--text-secondary);
 }
 
+.field-hint.is-ok {
+    color: var(--tr-green);
+}
+
+.field-hint.is-error {
+    color: var(--tr-red-text);
+}
+
+/* Example picker (online enhancement above the template box) */
+.example-host {
+    margin: 0 0 var(--space-150);
+}
+
+.example-host__controls {
+    display: flex;
+    gap: var(--space-100);
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.example-select {
+    flex: 1 1 260px;
+    min-width: 200px;
+}
+
 .field-row {
     display: flex;
     gap: var(--space-150);

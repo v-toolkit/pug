@@ -57,6 +57,16 @@ PUG.app = (function () {
         });
         bindFile("xml-import-file", importFromXml);
 
+        // Example picker (online enhancement; no-ops when fetch is unavailable).
+        on("example-select", "change", function () {
+            var sel = byId("example-select");
+            if (sel) loadExampleByIndex(parseInt(sel.value, 10) || 0);
+        });
+        on("example-load", "click", function () {
+            var sel = byId("example-select");
+            if (sel) loadExampleByIndex(parseInt(sel.value, 10) || 0);
+        });
+
         // Settings modal (the editor modal is managed inside scenarios.js).
         on("settings-open", "click", function () { openModal(byId("settings-modal")); });
         on("settings-close", "click", function () { closeModal(byId("settings-modal")); });
@@ -96,6 +106,7 @@ PUG.app = (function () {
             globalCountry = code;
             updateGlobalTemplateLink();
             if (PUG.scenarios.refreshCountry) PUG.scenarios.refreshCountry();
+            refreshExamples();
         });
     }
 
@@ -104,12 +115,13 @@ PUG.app = (function () {
         mountGlobalCountry();
         updateGlobalTemplateLink();
         if (PUG.scenarios.refreshCountry) PUG.scenarios.refreshCountry();
+        refreshExamples();
     }
 
     function updateGlobalTemplateLink() {
         var link = byId("global-template-link");
         if (!link) return;
-        var c = globalCountry ? PUF_DATA.countriesByCode[globalCountry] : null;
+        var c = globalCountry ? PUG_DATA.countriesByCode[globalCountry] : null;
         if (c && c.folder) {
             link.textContent = "open the " + c.name + " examples on GitHub ↗";
             link.setAttribute("href", GITHUB_BASE + encodeURIComponent(c.folder));
@@ -122,6 +134,68 @@ PUG.app = (function () {
     function getGlobalCountry() { return globalCountry; }
     function getGlobalTemplate() { return val("global-template"); }
     function getGlobalDirection() { return val("global-direction") || "AR"; }
+
+    /* --------------------------- example loading -------------------------- */
+
+    function currentFolder() {
+        var c = globalCountry ? PUG_DATA.countriesByCode[globalCountry] : null;
+        return (c && c.folder) || "";
+    }
+    function exampleStatus(msg, kind) {
+        var n = byId("example-status");
+        if (!n) return;
+        n.textContent = msg || "";
+        n.className = "field-hint" + (kind ? " is-" + kind : "");
+    }
+    function hideExamples() {
+        var host = byId("example-host");
+        if (host) host.setAttribute("hidden", "");
+        var sel = byId("example-select");
+        if (sel) { sel.innerHTML = ""; sel._entries = null; }
+    }
+    // Populate the picker for the current country. Auto-loads a default example
+    // only when the template box is empty (never clobbers a pasted/edited one).
+    function refreshExamples() {
+        var host = byId("example-host");
+        var sel = byId("example-select");
+        if (!host || !sel || !PUG.examples) return Promise.resolve();
+        var folder = currentFolder();
+        if (!folder || !PUG.examples.available()) { hideExamples(); return Promise.resolve(); }
+        return PUG.examples.forFolder(folder).then(function (entries) {
+            if (!entries || !entries.length) { hideExamples(); return; }
+            sel.innerHTML = "";
+            entries.forEach(function (e, i) {
+                var o = document.createElement("option");
+                o.value = String(i);
+                o.textContent = e.label + (e.kind === "creditnote" ? " — credit note" : "");
+                sel.appendChild(o);
+            });
+            sel._entries = entries;
+            var def = PUG.examples.defaultEntry(entries);
+            var defIdx = def ? entries.indexOf(def) : 0;
+            if (defIdx < 0) defIdx = 0;
+            sel.value = String(defIdx);
+            host.removeAttribute("hidden");
+            var ta = byId("global-template");
+            if (ta && !ta.value.trim()) return loadExampleByIndex(defIdx);
+            exampleStatus(entries.length + " example" + (entries.length > 1 ? "s" : "") + " available — pick one to load it (replaces the template below).");
+        }).catch(function () { hideExamples(); });
+    }
+    function loadExampleByIndex(i) {
+        var sel = byId("example-select");
+        var ta = byId("global-template");
+        if (!sel || !ta || !sel._entries) return Promise.resolve();
+        var e = sel._entries[i];
+        if (!e) return Promise.resolve();
+        exampleStatus("Loading " + e.label + "…");
+        return PUG.examples.fetchText(e.href).then(function (text) {
+            ta.value = text;
+            exampleStatus("Loaded " + e.label + ". Edit below, or pick another to replace it.", "ok");
+            setupStatus("Loaded example: " + e.label + ".", "info");
+        }).catch(function (err) {
+            exampleStatus("Couldn't fetch that example (" + ((err && err.message) || "network") + "). Copy it from GitHub and paste below.", "error");
+        });
+    }
 
     /* --------------------------- import from file ------------------------- */
 
@@ -314,7 +388,7 @@ PUG.app = (function () {
     }
 
     function prepareScenario(s, settings) {
-        var dt = PUF_DATA.getDocumentType(s.docType);
+        var dt = PUG_DATA.getDocumentType(s.docType);
         var currency = (s.currency || settings.currency || "EUR").toUpperCase();
         var country = (globalCountry || "").toUpperCase();
 
@@ -459,6 +533,7 @@ PUG.app = (function () {
         getSettings: getSettings,
         getGlobalCountry: getGlobalCountry,
         getGlobalTemplate: getGlobalTemplate,
+        refreshExamples: refreshExamples,
         getGlobalDirection: getGlobalDirection,
         setGlobalCountry: setGlobalCountry,
         validateScenario: validateScenario,

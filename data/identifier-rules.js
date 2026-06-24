@@ -21,7 +21,7 @@
 
 window.PUG_DATA = window.PUG_DATA || {};
 
-PUF_DATA.identifierRules = {
+PUG_DATA.identifierRules = {
     SE: {
         orgNumber: { digits: 10, check: "luhn", label: "Swedish org number" },
         vat: { re: "^SE\\d{12}$", label: "Swedish VAT" }

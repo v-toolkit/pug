@@ -67,11 +67,11 @@ PUG.scenarios = (function () {
             scenarioNumber: "",
             direction: "GLOBAL",
             docType: "INVOICE",
-            currency: PUF_DATA.defaultCurrencyFor(gc),
+            currency: PUG_DATA.defaultCurrencyFor(gc),
             issueDate: "",
             amount: "",
             payableAmount: "",
-            taxRate: PUF_DATA.defaultTaxRateFor(gc),
+            taxRate: PUG_DATA.defaultTaxRateFor(gc),
             taxCategory: "S",
             taxExemptionReason: "",
             originalInvoiceRef: "",
@@ -155,7 +155,7 @@ PUG.scenarios = (function () {
         return s.direction === "GLOBAL" ? d + " (global)" : d;
     }
     function docTypeLabel(key) {
-        var dt = PUF_DATA.getDocumentType(key);
+        var dt = PUG_DATA.getDocumentType(key);
         return dt ? dt.label : key;
     }
     function partySummary(s) {
@@ -273,7 +273,7 @@ PUG.scenarios = (function () {
         // Conditional field: only for credit notes.
         var billingField = field("Original invoice ref", textInput(s.originalInvoiceRef, "Number of the invoice being credited", function (v) { s.originalInvoiceRef = v; }));
 
-        var docOpts = PUF_DATA.enabledDocumentTypes().map(function (t) { return { value: t.key, label: t.label }; });
+        var docOpts = PUG_DATA.enabledDocumentTypes().map(function (t) { return { value: t.key, label: t.label }; });
         grid.appendChild(field("Document type", select(docOpts, s.docType, function (v) {
             s.docType = v;
             toggle(billingField, v === "CREDIT_NOTE");
@@ -331,7 +331,7 @@ PUG.scenarios = (function () {
     function countryText() {
         var code = globalCountry();
         if (!code) return "Not set — choose a country in Setup above";
-        var c = PUF_DATA.countriesByCode[code];
+        var c = PUG_DATA.countriesByCode[code];
         return c ? c.name + " (" + code + ")" : code;
     }
 
@@ -402,11 +402,11 @@ PUG.scenarios = (function () {
     function identifiers(party) {
         var host = el("div", { class: "id-host" });
         var code = globalCountry();
-        var defs = PUF_DATA.getCountryIdentifiers(code);
+        var defs = PUG_DATA.getCountryIdentifiers(code);
 
         var title = el("div", { class: "id-host__title" });
         title.textContent = code
-            ? "Identifiers — " + (PUF_DATA.countriesByCode[code] ? PUF_DATA.countriesByCode[code].name : code)
+            ? "Identifiers — " + (PUG_DATA.countriesByCode[code] ? PUG_DATA.countriesByCode[code].name : code)
             : "Identifiers (set a country in Setup)";
         host.appendChild(title);
 
@@ -424,7 +424,7 @@ PUG.scenarios = (function () {
 
     function countryControl(host, currentCode, onChange) {
         host.innerHTML = "";
-        if (currentCode && !PUF_DATA.countriesByCode[currentCode]) renderCustom(host, currentCode, onChange);
+        if (currentCode && !PUG_DATA.countriesByCode[currentCode]) renderCustom(host, currentCode, onChange);
         else renderSelect(host, currentCode || "", onChange);
     }
 
@@ -432,7 +432,7 @@ PUG.scenarios = (function () {
         host.innerHTML = "";
         var sel = el("select", { class: "field country-select" });
         sel.appendChild(option("", "Select country…"));
-        PUF_DATA.countries.forEach(function (c) { sel.appendChild(option(c.code, c.code + " — " + c.name)); });
+        PUG_DATA.countries.forEach(function (c) { sel.appendChild(option(c.code, c.code + " — " + c.name)); });
         sel.appendChild(option("__custom__", "Custom code…"));
         sel.value = currentCode || "";
         sel.addEventListener("change", function () {
