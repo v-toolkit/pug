@@ -14,13 +14,13 @@
   A scenario is committed only once it passes validation, at which point it
   appears as a read-only row. "Add scenario" / "Edit" (re)opens the editor.
 
-  Attached to window.PUF.scenarios.
+  Attached to window.PUG.scenarios.
 */
 
-window.PUF = window.PUF || {};
+window.PUG = window.PUG || {};
 
-PUF.scenarios = (function () {
-    var util = PUF.util;
+PUG.scenarios = (function () {
+    var util = PUG.util;
 
     var scenarios = [];          // committed scenarios (source of truth)
     var refs = {};               // DOM references (set in init)
@@ -90,8 +90,8 @@ PUF.scenarios = (function () {
 
     function cloneScenario(s) { return JSON.parse(JSON.stringify(s)); }
 
-    function globalCountry() { return (PUF.app && PUF.app.getGlobalCountry) ? PUF.app.getGlobalCountry() : ""; }
-    function globalDirection() { return (PUF.app && PUF.app.getGlobalDirection) ? PUF.app.getGlobalDirection() : "AR"; }
+    function globalCountry() { return (PUG.app && PUG.app.getGlobalCountry) ? PUG.app.getGlobalCountry() : ""; }
+    function globalDirection() { return (PUG.app && PUG.app.getGlobalDirection) ? PUG.app.getGlobalDirection() : "AR"; }
     function resolveDirection(s) { return s.direction === "GLOBAL" ? globalDirection() : s.direction; }
 
     /* ------------------------------ table (view) -------------------------- */
@@ -127,7 +127,7 @@ PUF.scenarios = (function () {
 
         var idCell = el("td");
         idCell.appendChild(document.createTextNode(s.scenarioNumber || "—"));
-        var warnings = (PUF.app.validateScenario(s) || {}).warnings || [];
+        var warnings = (PUG.app.validateScenario(s) || {}).warnings || [];
         if (warnings.length) {
             var badge = el("span", { class: "warn-badge", title: warnings.join("\n") });
             badge.textContent = "⚠ " + warnings.length;
@@ -194,7 +194,7 @@ PUF.scenarios = (function () {
     }
 
     function onSave() {
-        var result = PUF.app.validateScenario(working);
+        var result = PUG.app.validateScenario(working);
         if (result.errors.length) { setErrors(result.errors.join(" ")); return; }
 
         if (editMode === "edit") {
@@ -236,7 +236,7 @@ PUF.scenarios = (function () {
     // block on Save). Updates as the user edits.
     function renderIssues(s) {
         if (!editorIssuesEl || !s) return;
-        var res = PUF.app.validateScenario(s);
+        var res = PUG.app.validateScenario(s);
         editorIssuesEl.innerHTML = "";
         if (!res.errors.length && !res.warnings.length) {
             editorIssuesEl.setAttribute("hidden", "hidden");

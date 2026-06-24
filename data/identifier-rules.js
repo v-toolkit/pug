@@ -16,10 +16,10 @@
   These drive *warnings*, never hard errors — a user may have a legitimate edge
   case, and this tool builds test data as well as real documents.
 
-  Attached to window.PUF_DATA (shared global; loaded after countries.js).
+  Attached to window.PUG_DATA (shared global; loaded after countries.js).
 */
 
-window.PUF_DATA = window.PUF_DATA || {};
+window.PUG_DATA = window.PUG_DATA || {};
 
 PUF_DATA.identifierRules = {
     SE: {

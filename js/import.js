@@ -4,7 +4,7 @@
   js/import.js
   ------------
   Turns a pasted / CSV scenario table into scenario objects. Attached to
-  window.PUF.import.
+  window.PUG.import.
 
   Recognised columns (case / spacing / punctuation insensitive):
     Core    : scenario number, direction, document type, country, currency,
@@ -16,10 +16,10 @@
               "seller siret", "buyer gstin", "supplier org number".
 */
 
-window.PUF = window.PUF || {};
+window.PUG = window.PUG || {};
 
-PUF.import = (function () {
-    var util = PUF.util;
+PUG.import = (function () {
+    var util = PUG.util;
 
     var CORE_ALIASES = {
         scenarioNumber: ["scenario", "scenario number", "number", "no", "id", "invoice number", "invoice no", "document number", "doc number", "ref", "reference"],

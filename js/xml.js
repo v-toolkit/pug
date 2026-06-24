@@ -5,17 +5,17 @@
   ---------
   Everything XML: building party blocks from the country field definitions,
   parsing an uploaded PUF/UBL file back into a scenario, and generating output
-  (placeholder mode or best-effort mode). Attached to window.PUF.xml.
+  (placeholder mode or best-effort mode). Attached to window.PUG.xml.
 
-  The country data (window.PUF_DATA) drives both directions: the same field
+  The country data (window.PUG_DATA) drives both directions: the same field
   definitions that render the form also decide where each value is written in
   UBL and how it is read back.
 */
 
-window.PUF = window.PUF || {};
+window.PUG = window.PUG || {};
 
-PUF.xml = (function () {
-    var util = PUF.util;
+PUG.xml = (function () {
+    var util = PUG.util;
     var esc = util.escapeXml;
 
     /* ---------------------------------------------------------------------- */

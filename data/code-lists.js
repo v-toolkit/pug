@@ -9,10 +9,10 @@
   and is how we validate values without a network. Invoice *templates* are
   never bundled.
 
-  Attached to window.PUF_DATA (loaded after countries.js, before validation.js).
+  Attached to window.PUG_DATA (loaded after countries.js, before validation.js).
 */
 
-window.PUF_DATA = window.PUF_DATA || {};
+window.PUG_DATA = window.PUG_DATA || {};
 
 (function () {
     // ISO 4217 — active currency codes (broad; includes the common supranational

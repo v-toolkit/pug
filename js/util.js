@@ -3,13 +3,13 @@
 /*
   js/util.js
   ----------
-  Small shared helpers. Attached to window.PUF.util so the other plain-script
+  Small shared helpers. Attached to window.PUG.util so the other plain-script
   modules can use them without a build step (works when opened via file://).
 */
 
-window.PUF = window.PUF || {};
+window.PUG = window.PUG || {};
 
-PUF.util = (function () {
+PUG.util = (function () {
 
     function byId(id) {
         return document.getElementById(id);

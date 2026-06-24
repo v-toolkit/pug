@@ -16,12 +16,12 @@
   NOT covered (and deliberately so — needs services a browser tool can't host):
     full schematron, live registry lookups, ZATCA crypto stamps, QR/hash chains.
 
-  Attached to window.PUF.validate. Loaded after the data files, before app.js.
+  Attached to window.PUG.validate. Loaded after the data files, before app.js.
 */
 
-window.PUF = window.PUF || {};
+window.PUG = window.PUG || {};
 
-PUF.validate = (function () {
+PUG.validate = (function () {
 
     /* --------------------------- check digits ----------------------------- */
 

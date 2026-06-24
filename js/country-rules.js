@@ -15,12 +15,12 @@
   Coverage so far:
     SE — org/VAT presence (SE-R format + Luhn live in identifier-rules/validation)
     DE — seller contact (name/phone/email), seller+buyer city/postcode, seller VAT
-  Attached to window.PUF.countryRules. Loaded after validation.js, before app.js.
+  Attached to window.PUG.countryRules. Loaded after validation.js, before app.js.
 */
 
-window.PUF = window.PUF || {};
+window.PUG = window.PUG || {};
 
-PUF.countryRules = (function () {
+PUG.countryRules = (function () {
 
     function iso(code) {
         return PUF_DATA.isoCountryCode ? PUF_DATA.isoCountryCode(code) : (code || "").toUpperCase();

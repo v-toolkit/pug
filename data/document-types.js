@@ -23,7 +23,7 @@
     customizationId / profileId   PUF billing identifiers
 */
 
-window.PUF_DATA = window.PUF_DATA || {};
+window.PUG_DATA = window.PUG_DATA || {};
 
 PUF_DATA.documentTypes = [
     {

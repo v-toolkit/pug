@@ -39,7 +39,7 @@
   that country's `identifiers` array. Nothing else needs to change.
 */
 
-window.PUF_DATA = window.PUF_DATA || {};
+window.PUG_DATA = window.PUG_DATA || {};
 
 // Fallback identifiers used when a custom / unlisted country code is entered.
 PUF_DATA.defaultIdentifiers = [

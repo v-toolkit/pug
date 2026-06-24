@@ -7,13 +7,13 @@
   direction) that applies to every scenario. Wires the top-level buttons,
   validates a scenario before it is added, runs generation (writing each
   scenario's values into the one global template) and handles downloads.
-  Attached to window.PUF.app. Loaded last.
+  Attached to window.PUG.app. Loaded last.
 */
 
-window.PUF = window.PUF || {};
+window.PUG = window.PUG || {};
 
-PUF.app = (function () {
-    var util = PUF.util;
+PUG.app = (function () {
+    var util = PUG.util;
     var byId = util.byId;
     var generated = [];          // [{ filename, xml }]
     var globalCountry = "";      // updated by the Setup country picker
@@ -21,7 +21,7 @@ PUF.app = (function () {
     var GITHUB_BASE = "https://github.com/pagero/puf-billing/tree/master/examples/country-specific-examples/";
 
     function init() {
-        PUF.scenarios.init({
+        PUG.scenarios.init({
             tbody: byId("scenario-tbody"),
             modal: byId("editor-modal"),
             title: byId("editor-title"),
@@ -33,23 +33,23 @@ PUF.app = (function () {
         });
         mountGlobalCountry();
         updateGlobalTemplateLink();
-        PUF.scenarios.render();
+        PUG.scenarios.render();
         bindEvents();
     }
 
     /* ------------------------------- events ------------------------------- */
 
     function bindEvents() {
-        on("add-scenario", "click", function () { PUF.scenarios.openEditor("add"); });
+        on("add-scenario", "click", function () { PUG.scenarios.openEditor("add"); });
         on("clear-scenarios", "click", function () {
-            if (PUF.scenarios.getScenarios().length && !confirm("Remove all scenarios?")) return;
-            PUF.scenarios.clear();
+            if (PUG.scenarios.getScenarios().length && !confirm("Remove all scenarios?")) return;
+            PUG.scenarios.clear();
         });
         on("generate", "click", generate);
         on("download-all", "click", downloadAll);
 
         // Global setup.
-        on("global-direction", "change", function () { PUF.scenarios.render(); });
+        on("global-direction", "change", function () { PUG.scenarios.render(); });
         bindFile("global-template-file", function (text) {
             var ta = byId("global-template");
             if (ta) ta.value = text;
@@ -92,10 +92,10 @@ PUF.app = (function () {
     function mountGlobalCountry() {
         var host = byId("global-country-host");
         if (!host) return;
-        PUF.scenarios.countryControl(host, globalCountry, function (code) {
+        PUG.scenarios.countryControl(host, globalCountry, function (code) {
             globalCountry = code;
             updateGlobalTemplateLink();
-            if (PUF.scenarios.refreshCountry) PUF.scenarios.refreshCountry();
+            if (PUG.scenarios.refreshCountry) PUG.scenarios.refreshCountry();
         });
     }
 
@@ -103,7 +103,7 @@ PUF.app = (function () {
         globalCountry = code || "";
         mountGlobalCountry();
         updateGlobalTemplateLink();
-        if (PUF.scenarios.refreshCountry) PUF.scenarios.refreshCountry();
+        if (PUG.scenarios.refreshCountry) PUG.scenarios.refreshCountry();
     }
 
     function updateGlobalTemplateLink() {
@@ -128,8 +128,8 @@ PUF.app = (function () {
     function importFromXml(text, name) {
         var doc, ex;
         try {
-            doc = PUF.xml.parseXmlString(text);
-            ex = PUF.xml.extractScenario(doc);
+            doc = PUG.xml.parseXmlString(text);
+            ex = PUG.xml.extractScenario(doc);
         } catch (err) {
             setupStatus("Could not parse " + (name || "file") + ": " + err.message, "error");
             return;
@@ -141,7 +141,7 @@ PUF.app = (function () {
         if (ex.country) setGlobalCountry(ex.country);
         else updateGlobalTemplateLink();
 
-        var s = PUF.scenarios.newScenario();
+        var s = PUG.scenarios.newScenario();
         s.scenarioNumber = ex.scenarioNumber || s.scenarioNumber;
         s.docType = ex.docType || "INVOICE";
         s.currency = ex.currency || "";
@@ -152,7 +152,7 @@ PUF.app = (function () {
         s.buyer = mergeParty(s.buyer, ex.buyer);
 
         setupStatus("Loaded " + (name || "file") + " as the template" + (ex.country ? " (" + ex.country + ")" : "") + ". Review the scenario and add it.", "info");
-        PUF.scenarios.openEditorWith(s);
+        PUG.scenarios.openEditorWith(s);
     }
 
     function mergeParty(base, parsed) {
@@ -195,18 +195,18 @@ PUF.app = (function () {
 
         // Tax-category business rules (BR-S / BR-Z / BR-E / BR-AE …) + Swedish rates.
         var taxCtx = {}; Object.keys(s).forEach(function (k) { taxCtx[k] = s[k]; }); taxCtx.country = globalCountry;
-        warnings = warnings.concat(PUF.validate.taxCategoryIssues(taxCtx));
+        warnings = warnings.concat(PUG.validate.taxCategoryIssues(taxCtx));
 
         // Identifier presence + format/check-digit validation.
         if (!globalCountry) warnings.push("No country set in Setup — identifier fields are generic.");
         else {
             checkParty("Seller", s.seller, warnings);
             checkParty("Buyer", s.buyer, warnings);
-            warnings = warnings.concat(PUF.validate.identifierIssues(globalCountry, s.seller && s.seller.ids, "Seller"));
-            warnings = warnings.concat(PUF.validate.identifierIssues(globalCountry, s.buyer && s.buyer.ids, "Buyer"));
-            warnings = warnings.concat(PUF.countryRules.issues(globalCountry, s));
+            warnings = warnings.concat(PUG.validate.identifierIssues(globalCountry, s.seller && s.seller.ids, "Seller"));
+            warnings = warnings.concat(PUG.validate.identifierIssues(globalCountry, s.buyer && s.buyer.ids, "Buyer"));
+            warnings = warnings.concat(PUG.countryRules.issues(globalCountry, s));
         }
-        warnings = warnings.concat(PUF.validate.valueIssues(s, globalCountry));
+        warnings = warnings.concat(PUG.validate.valueIssues(s, globalCountry));
         return { errors: errors, warnings: warnings };
     }
 
@@ -218,7 +218,7 @@ PUF.app = (function () {
     /* ------------------------------ generate ------------------------------ */
 
     function generate() {
-        var list = PUF.scenarios.getScenarios();
+        var list = PUG.scenarios.getScenarios();
         if (!list.length) { scenarioStatus("Add at least one scenario first.", "error"); return; }
 
         var template = getGlobalTemplate();
@@ -232,9 +232,9 @@ PUF.app = (function () {
 
         // Structural guard: the template root (<Invoice>/<CreditNote>) can't be
         // rewritten, so a scenario's document type must match it.
-        var rt = PUF.validate.rootType(template);
+        var rt = PUG.validate.rootType(template);
         var rootLabel = rt === "CREDIT_NOTE" ? "<CreditNote>" : (rt === "INVOICE" ? "<Invoice>" : "the template");
-        var mismatched = list.filter(function (s) { return !PUF.validate.rootMatchesDocType(rt, s.docType); })
+        var mismatched = list.filter(function (s) { return !PUG.validate.rootMatchesDocType(rt, s.docType); })
             .map(function (s) { return s.scenarioNumber || "(unnamed)"; });
         if (mismatched.length) {
             scenarioStatus("Template root is " + rootLabel + ", but these scenarios are the other document type: " +
@@ -246,7 +246,7 @@ PUF.app = (function () {
         try {
             list.forEach(function (s) {
                 var prepared = prepareScenario(s, settings);
-                var xml = PUF.xml.generate(template, prepared);
+                var xml = PUG.xml.generate(template, prepared);
                 generated.push({ filename: createFilename(prepared, settings.filenameMode), xml: xml, country: prepared.country });
             });
         } catch (err) {
@@ -259,7 +259,7 @@ PUF.app = (function () {
         var notes = [];
         if (!globalCountry) notes.push("no country set, identifiers may be generic");
         if (multiLine) notes.push("template has multiple lines, so amounts/tax were left to the template");
-        var prof = PUF.validate.profileIssues(template);
+        var prof = PUG.validate.profileIssues(template);
         if (prof.length) notes.push(prof[0]);
         var msg = "Generated " + generated.length + " file(s). ";
         if (failed.length) {
@@ -280,7 +280,7 @@ PUF.app = (function () {
         files.forEach(function (f) {
             var xml = f.xml;
             if (xml.indexOf("{{") >= 0) fails["leftover {{ }} tokens"] = true;
-            try { PUF.xml.parseXmlString(xml); } catch (e) { fails["not well-formed XML"] = true; }
+            try { PUG.xml.parseXmlString(xml); } catch (e) { fails["not well-formed XML"] = true; }
             if (/<(?:[\w.-]+:)?ID>\s*<\//.test(xml)) fails["empty document ID"] = true;
             if (!/<(?:[\w.-]+:)?IssueDate>\s*\d{4}-\d{2}-\d{2}/.test(xml)) fails["missing/!ISO issue date"] = true;
 
@@ -298,7 +298,7 @@ PUF.app = (function () {
             if (/<(?:[\w.-]+:)?CreditNote\b/.test(xml) && !/<(?:[\w.-]+:)?BillingReference\b/.test(xml)) {
                 fails["credit note missing BillingReference"] = true;
             }
-            var schemeIssue = PUF.validate.taxSchemeIssue(xml, f.country);
+            var schemeIssue = PUG.validate.taxSchemeIssue(xml, f.country);
             if (schemeIssue) fails[schemeIssue] = true;
         });
         return Object.keys(fails);
@@ -468,7 +468,7 @@ PUF.app = (function () {
 })();
 
 if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", PUF.app.init);
+    document.addEventListener("DOMContentLoaded", PUG.app.init);
 } else {
-    PUF.app.init();
+    PUG.app.init();
 }
