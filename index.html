@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PUG — Pagero Universal Generator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="tr-page">
+
+        <!-- Top bar -->
+        <header class="tr-topbar">
+            <div class="tr-container tr-topbar__inner">
+                <div class="tr-topbar__brand">
+                    <span class="tr-topbar__title">PUG — Pagero Universal Generator</span>
+                </div>
+                <button id="settings-open" type="button" class="btn btn--ghost-light">⚙ Settings</button>
+            </div>
+        </header>
+
+        <!-- Hero -->
+        <section class="hero">
+            <div class="tr-container hero__inner">
+                <div class="hero__content">
+                    <p class="tr-eyebrow">Pagero Universal Generator</p>
+                    <h1 class="tr-headline-1">Build Pagero Universal Format invoice &amp; credit-note XML</h1>
+                    <p class="tr-subhead">
+                        Set the country, template and default direction once in Setup, then add scenarios.
+                        Each scenario is one document, and every party shows the identifier fields its country
+                        actually uses — SIREN and SIRET for France, GSTIN and PAN for India, VAT and
+                        registration numbers elsewhere.
+                    </p>
+                </div>
+
+                <aside class="hero__card">
+                    <h2 class="tr-inline-heading">Grounded in real examples</h2>
+                    <p class="tr-body">
+                        The template comes from Pagero's public country examples on GitHub, so nothing is baked
+                        in to go stale. Your values are written into the example you provide — always validate
+                        the output before sending.
+                    </p>
+                </aside>
+            </div>
+        </section>
+
+        <main class="tr-container app-stack">
+
+            <!-- Setup (global) -->
+            <section class="tr-card">
+                <div class="section-head">
+                    <div>
+                        <h2 class="tr-inline-heading">Setup</h2>
+                        <p class="tr-text-secondary section-sub">Applies to every scenario. Choose the country, set the
+                            default direction, and provide the country example as the template.</p>
+                    </div>
+                </div>
+
+                <div class="setup-grid">
+                    <div class="editor-field">
+                        <label class="field-label">Country</label>
+                        <div id="global-country-host" class="country-host"></div>
+                    </div>
+                    <div class="editor-field">
+                        <label class="field-label" for="global-direction">Default direction</label>
+                        <select id="global-direction" class="field">
+                            <option value="AR">AR — I sell (Accounts Receivable)</option>
+                            <option value="AP">AP — I buy (Accounts Payable)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="setup-template">
+                    <label class="field-label" for="global-template">Template — country example (required to
+                        generate)</label>
+                    <p class="template-link tr-text-secondary">
+                        Get the current example, copy an invoice file, and paste it below:
+                        <a id="global-template-link" target="_blank" rel="noopener noreferrer">select a country to get
+                            its example link</a>
+                    </p>
+                    <textarea id="global-template" class="textarea code" rows="6"
+                        placeholder="Paste a PUF / UBL invoice example for the selected country here. Each scenario's values are written into its structure."></textarea>
+                    <div class="button-row">
+                        <label class="btn btn--ghost file-btn">
+                            Load example file
+                            <input id="global-template-file" type="file" accept=".xml,text/xml,application/xml" hidden>
+                        </label>
+                    </div>
+                </div>
+
+                <p id="setup-status" class="status"></p>
+            </section>
+
+            <!-- Scenarios -->
+            <section class="tr-card">
+                <div class="section-head">
+                    <div>
+                        <h2 class="tr-inline-heading">Scenarios</h2>
+                        <p class="tr-text-secondary section-sub">Each row is a completed document. Use “Add scenario” to
+                            create one, or “Edit” to change it.</p>
+                    </div>
+                    <span id="scenario-count" class="count-badge"></span>
+                </div>
+
+                <div class="table-scroll">
+                    <table class="scenario-table scenario-table--view">
+                        <thead>
+                            <tr>
+                                <th>Scenario&nbsp;#</th>
+                                <th>Direction</th>
+                                <th>Document&nbsp;type</th>
+                                <th>Issue&nbsp;date</th>
+                                <th>Amount</th>
+                                <th>Seller&nbsp;→&nbsp;Buyer</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scenario-tbody"></tbody>
+                    </table>
+                </div>
+
+                <div class="button-row">
+                    <button id="add-scenario" type="button" class="btn btn--secondary">+ Add scenario</button>
+                    <label class="btn btn--ghost file-btn">
+                        Import from file
+                        <input id="xml-import-file" type="file" accept=".xml,text/xml,application/xml" hidden>
+                    </label>
+                    <span class="spacer"></span>
+                    <button id="clear-scenarios" type="button" class="btn btn--ghost">Clear all</button>
+                    <button id="generate" type="button" class="btn btn--primary">Generate XML</button>
+                </div>
+
+                <p id="scenario-status" class="status"></p>
+            </section>
+
+            <!-- Output -->
+            <section class="tr-card">
+                <div class="section-head">
+                    <div>
+                        <h2 class="tr-inline-heading">Output</h2>
+                        <p id="preview-info" class="tr-text-secondary section-sub"></p>
+                    </div>
+                    <button id="download-all" type="button" class="btn btn--primary" disabled>Download all</button>
+                </div>
+                <pre id="preview" class="preview" aria-live="polite"></pre>
+            </section>
+
+            <footer class="app-footer">
+                <div class="app-footer__row">
+                    <div class="app-footer__credits">
+                        <span class="app-footer__item"><span class="app-footer__label">Created by</span> Your
+                            name</span>
+                        <span class="app-footer__item"><span class="app-footer__label">Created for</span> Your team /
+                            organisation</span>
+                    </div>
+                    <nav class="app-footer__links" aria-label="Related links">
+                        <a href="https://validex.net/" target="_blank" rel="noopener noreferrer">Validate with Validex
+                            ↗</a>
+                        <a href="https://github.com/pagero/puf-billing" target="_blank" rel="noopener noreferrer">GitHub
+                            repo ↗</a>
+                    </nav>
+                </div>
+                <p class="app-footer__note tr-text-secondary">
+                    Identifier fields and scheme IDs are grounded in the public Pagero PUF example files.
+                    Verify generated documents before sending.
+                </p>
+            </footer>
+        </main>
+    </div>
+
+    <!-- Editor modal (create / edit a scenario) -->
+    <div id="editor-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="editor-title">
+        <div class="modal__panel modal__panel--wide">
+            <div class="modal__head">
+                <h2 id="editor-title" class="tr-inline-heading">Add scenario</h2>
+                <button id="editor-close" type="button" class="modal__close" aria-label="Close">✕</button>
+            </div>
+            <div id="editor-body" class="modal__body"></div>
+            <div class="modal__foot editor-foot">
+                <span id="editor-errors" class="status status--error" role="alert"></span>
+                <span class="spacer"></span>
+                <button id="editor-cancel" type="button" class="btn btn--ghost">Cancel</button>
+                <button id="editor-save" type="button" class="btn btn--primary">Add scenario</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings modal -->
+    <div id="settings-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <div class="modal__panel">
+            <div class="modal__head">
+                <h2 id="settings-title" class="tr-inline-heading">Settings</h2>
+                <button id="settings-close" type="button" class="modal__close" aria-label="Close">✕</button>
+            </div>
+            <div class="modal__body tr-stack-sm">
+                <label class="field-label" for="setting-currency">Default currency (used when a scenario leaves currency
+                    blank)</label>
+                <input id="setting-currency" class="field" type="text" maxlength="3" placeholder="EUR" value="EUR">
+
+                <label class="field-label" for="setting-payable">Payable amount</label>
+                <select id="setting-payable" class="field">
+                    <option value="PAYABLE_OR_AMOUNT">Use payable if set, otherwise the amount</option>
+                    <option value="USE_AMOUNT">Always equal to the amount</option>
+                    <option value="FORCE_ZERO">Always 0.00</option>
+                    <option value="KEEP_TEMPLATE">Leave the template's value</option>
+                </select>
+
+                <label class="checkbox">
+                    <input id="setting-fill-tax" type="checkbox" checked>
+                    <span>Overwrite the template's tax / line / price amounts with the scenario amount</span>
+                </label>
+
+                <label class="field-label" for="setting-filename">File name</label>
+                <select id="setting-filename" class="field">
+                    <option value="scenario">Scenario number</option>
+                    <option value="scenario_seller">Scenario number + seller</option>
+                    <option value="scenario_buyer">Scenario number + buyer</option>
+                    <option value="scenario_both">Scenario number + seller-to-buyer</option>
+                </select>
+            </div>
+            <div class="modal__foot">
+                <button id="settings-done" type="button" class="btn btn--primary">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data (static reference) -->
+    <script src="data/countries.js"></script>
+    <script src="data/document-types.js"></script>
+    <script src="data/identifier-rules.js"></script>
+    <script src="data/code-lists.js"></script>
+    <!-- Logic -->
+    <script src="js/util.js"></script>
+    <script src="js/xml.js"></script>
+    <script src="js/validation.js"></script>
+    <script src="js/country-rules.js"></script>
+    <script src="js/scenarios.js"></script>
+    <script src="js/app.js"></script>
+</body>
+
+</html>
