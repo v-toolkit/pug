@@ -1059,3 +1059,8 @@ code {
     white-space: nowrap;
     cursor: help;
 }
+/* --- Invoice line rows (scenario editor) ------------------------------- */
+.lines-host { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
+.line-row { border: 1px solid #e2e5e2; border-radius: 8px; padding: 12px 14px; background: #fafbfa; }
+.line-row__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.line-row__title { font-weight: 600; font-size: 0.82rem; letter-spacing: 0.02em; color: #4a544c; }

@@ -206,42 +206,121 @@ PUG.xml = (function () {
         // Currency attribute sync on every monetary element.
         if (s.currency) xml = xml.replace(/currencyID="[^"]*"/g, 'currencyID="' + s.currency + '"');
 
-        var hasAmount = s.fillTaxTotals && s.net != null && s.net !== "";
-        if (!hasAmount) {
+        var model = (s.lines && s.lines.length) ? s.lines : null;
+        var multi = !!(model && model.length > 1);
+        var doFill = s.fillTaxTotals || multi;
+
+        if (!doFill) {
             if (!s.keepTemplatePayable && s.payable) {
                 xml = withinBlock(xml, "LegalMonetaryTotal", function (i) { return replaceFirstTagValue(i, "PayableAmount", s.payable); });
             }
             return xml;
         }
 
-        var lineCount = (xml.match(/<(?:[\w.-]+:)?(?:Invoice|CreditNote)Line\b/g) || []).length;
+        // Preferred path: rebuild lines, tax subtotals and totals from the
+        // scenario's line model, reusing the template's own line / subtotal
+        // blocks as prototypes (best-effort — nothing is built from scratch).
+        if (model) {
+            xml = rebuildLines(xml, s, model);
+            xml = rebuildTaxTotals(xml, s);
+            xml = rebuildLegalTotals(xml, s);
+            return xml;
+        }
 
-        // Tax totals (document level): TaxAmount, TaxableAmount, category/rate.
+        // Legacy fallback (no line model): drive a single line + totals from net.
         xml = withinEachBlock(xml, "TaxTotal", function (i) {
             i = replaceAllTagValues(i, "TaxAmount", s.tax);
             i = replaceAllTagValues(i, "TaxableAmount", s.net);
             i = setTaxCategories(i, s);
             return i;
         });
-
-        if (lineCount <= 1) {
-            // Single line: drive line + totals from the one net amount.
-            xml = withinEachBlock(xml, "InvoiceLine", function (i) { return setLineAmounts(i, s); });
-            xml = withinEachBlock(xml, "CreditNoteLine", function (i) { return setLineAmounts(i, s); });
-            xml = withinBlock(xml, "LegalMonetaryTotal", function (i) {
-                i = replaceFirstTagValue(i, "LineExtensionAmount", s.net);
-                i = replaceFirstTagValue(i, "TaxExclusiveAmount", s.net);
-                i = replaceFirstTagValue(i, "TaxInclusiveAmount", s.gross);
-                if (!s.keepTemplatePayable && s.payable) i = replaceFirstTagValue(i, "PayableAmount", s.payable);
-                return i;
-            });
-        } else {
-            // Multiple lines: don't touch amounts (we can't split a single total
-            // across lines); only set the tax category/rate on each line.
-            xml = withinEachBlock(xml, "InvoiceLine", function (i) { return setTaxCategories(i, s); });
-            xml = withinEachBlock(xml, "CreditNoteLine", function (i) { return setTaxCategories(i, s); });
-        }
+        xml = withinEachBlock(xml, "InvoiceLine", function (i) { return setLineAmounts(i, s); });
+        xml = withinEachBlock(xml, "CreditNoteLine", function (i) { return setLineAmounts(i, s); });
+        xml = withinBlock(xml, "LegalMonetaryTotal", function (i) {
+            i = replaceFirstTagValue(i, "LineExtensionAmount", s.net);
+            i = replaceFirstTagValue(i, "TaxExclusiveAmount", s.net);
+            i = replaceFirstTagValue(i, "TaxInclusiveAmount", s.gross);
+            if (!s.keepTemplatePayable && s.payable) i = replaceFirstTagValue(i, "PayableAmount", s.payable);
+            return i;
+        });
         return xml;
+    }
+
+    /* ---- multi-line best-effort: rebuild from the scenario line model ----- */
+
+    // Replace the template's invoice / credit-note lines with one edited clone
+    // of the first line block per scenario line.
+    function rebuildLines(xml, s, model) {
+        var isCredit = /<(?:[\w.-]+:)?CreditNoteLine\b/.test(xml);
+        var lineLocal = isCredit ? "CreditNoteLine" : "InvoiceLine";
+        var qtyLocal = isCredit ? "CreditedQuantity" : "InvoicedQuantity";
+
+        var proto = null;
+        xml.replace(blockPattern(lineLocal), function (m) { if (proto === null) proto = m; return m; });
+        if (proto === null) return xml;
+
+        var reason = s.docExemptionReason || "";
+        var blocks = model.map(function (ln, idx) {
+            return editLineBlock(proto, ln, idx + 1, qtyLocal, reason);
+        }).join("\n            ");
+
+        var seen = 0;
+        return xml.replace(blockPattern(lineLocal, "g"), function (m) { seen++; return seen === 1 ? blocks : ""; });
+    }
+
+    function editLineBlock(proto, ln, id, qtyLocal, reason) {
+        var b = proto;
+        b = replaceFirstTagValue(b, "ID", String(id));
+        if (ln.quantity != null && String(ln.quantity).trim() !== "") b = replaceFirstTagValue(b, qtyLocal, String(ln.quantity).trim());
+        if (ln.unitCode) b = b.replace(new RegExp("(<(?:[\\w.-]+:)?" + qtyLocal + "\\b[^>]*?)\\sunitCode=\"[^\"]*\""), "$1 unitCode=\"" + ln.unitCode + "\"");
+        b = replaceFirstTagValue(b, "LineExtensionAmount", ln.net);
+        if (ln.name) b = replaceFirstTagValue(b, "Name", esc(ln.name));
+        if (ln.description) b = replaceFirstTagValue(b, "Description", esc(ln.description));
+        b = withinEachBlock(b, "ClassifiedTaxCategory", function (c) {
+            if (ln.taxCategory) c = replaceFirstTagValue(c, "ID", ln.taxCategory);
+            if (ln.rate != null && ln.rate !== "") c = replaceFirstTagValue(c, "Percent", ln.rate);
+            c = setExemptionReason(c, (ln.taxCategory === "S") ? "" : reason);
+            return c;
+        });
+        b = withinBlock(b, "Price", function (p) { return replaceFirstTagValue(p, "PriceAmount", ln.unitPrice); });
+        return b;
+    }
+
+    // Rebuild TaxTotal: document tax amount + one subtotal per (category, rate).
+    function rebuildTaxTotals(xml, s) {
+        var groups = s.taxGroups || [];
+        return withinBlock(xml, "TaxTotal", function (inner) {
+            inner = replaceFirstTagValue(inner, "TaxAmount", s.tax);
+            var proto = null;
+            inner.replace(blockPattern("TaxSubtotal"), function (m) { if (proto === null) proto = m; return m; });
+            if (proto === null || !groups.length) return inner;
+            var subs = groups.map(function (g) { return editSubtotal(proto, g, s.docExemptionReason || ""); }).join("\n        ");
+            var seen = 0;
+            return inner.replace(blockPattern("TaxSubtotal", "g"), function (m) { seen++; return seen === 1 ? subs : ""; });
+        });
+    }
+
+    function editSubtotal(proto, g, reason) {
+        var b = proto;
+        b = replaceFirstTagValue(b, "TaxableAmount", g.taxable);
+        b = replaceFirstTagValue(b, "TaxAmount", g.tax);
+        b = withinBlock(b, "TaxCategory", function (c) {
+            if (g.category) c = replaceFirstTagValue(c, "ID", g.category);
+            if (g.rate != null && g.rate !== "") c = replaceFirstTagValue(c, "Percent", g.rate);
+            c = setExemptionReason(c, (g.category === "S") ? "" : reason);
+            return c;
+        });
+        return b;
+    }
+
+    function rebuildLegalTotals(xml, s) {
+        return withinBlock(xml, "LegalMonetaryTotal", function (i) {
+            i = replaceFirstTagValue(i, "LineExtensionAmount", s.net);
+            i = replaceFirstTagValue(i, "TaxExclusiveAmount", s.net);
+            i = replaceFirstTagValue(i, "TaxInclusiveAmount", s.gross);
+            if (!s.keepTemplatePayable && s.payable) i = replaceFirstTagValue(i, "PayableAmount", s.payable);
+            return i;
+        });
     }
 
     // Set Percent + category ID (and exemption reason if present) inside every

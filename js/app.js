@@ -264,8 +264,8 @@ PUG.app = (function () {
             errors.push("A credit note requires the original invoice reference (BillingReference).");
         }
 
-        if (s.amount && s.amount.trim() && !util.normaliseAmount(s.amount)) warnings.push("Amount is not a number.");
-        if (!(s.amount && s.amount.trim())) warnings.push("No amount set — the template's amounts are kept.");
+        var hasLineAmount = (s.lines || []).some(function (l) { return l && util.normaliseAmount(l.unitPrice) !== ""; });
+        if (!hasLineAmount && !(s.amount && s.amount.trim())) warnings.push("No line amounts set — the template's amounts are kept.");
 
         // Tax-category business rules (BR-S / BR-Z / BR-E / BR-AE …) + Swedish rates.
         var taxCtx = {}; Object.keys(s).forEach(function (k) { taxCtx[k] = s[k]; }); taxCtx.country = globalCountry;
@@ -392,22 +392,64 @@ PUG.app = (function () {
         var currency = (s.currency || settings.currency || "EUR").toUpperCase();
         var country = (globalCountry || "").toUpperCase();
 
-        var net = util.normaliseAmount(s.amount);
-        var category = s.taxCategory || "S";
-        var entered = (s.taxRate == null ? "" : String(s.taxRate)).trim();
-        // Non-standard categories (Z/E/AE/K/G/O) carry a 0 rate and no tax; the
-        // exemption reason is written instead (AE also implies excl = incl).
-        var isStandard = category === "S";
-        var rateNum = isStandard && isFinite(parseFloat(entered)) ? parseFloat(entered) : 0;
-        var writtenRate = isStandard ? entered : "0";
-        var tax = "", gross = "";
-        if (net !== "") {
-            var netNum = parseFloat(net);
-            var taxNum = roundNum(netNum * rateNum / 100);
-            tax = taxNum.toFixed(2);
-            gross = roundNum(netNum + taxNum).toFixed(2);
+        var docExemption = (s.taxExemptionReason || "").trim();
+
+        // Effective lines: prefer explicit lines with a price; otherwise fall
+        // back to a single line synthesised from a legacy "amount" (imports).
+        var rawLines = (s.lines || []).filter(function (l) {
+            return l && util.normaliseAmount(l.unitPrice) !== "";
+        });
+        if (!rawLines.length && util.normaliseAmount(s.amount) !== "") {
+            rawLines = [{ name: "", description: "", quantity: "1", unitCode: "", unitPrice: s.amount, taxCategory: s.taxCategory || "S", rate: s.taxRate }];
         }
+
+        var lines = rawLines.map(function (l) {
+            var category = l.taxCategory || "S";
+            var isStandard = category === "S";
+            var qtyNum = parseFloat(l.quantity); if (!isFinite(qtyNum)) qtyNum = 1;
+            var priceNum = parseFloat(util.normaliseAmount(l.unitPrice)); if (!isFinite(priceNum)) priceNum = 0;
+            var netNum = roundNum(qtyNum * priceNum);
+            var enteredRate = (l.rate == null ? "" : String(l.rate)).trim();
+            var writtenRate = isStandard ? enteredRate : "0";
+            return {
+                name: (l.name || "").trim(),
+                description: (l.description || "").trim(),
+                quantity: (l.quantity == null || String(l.quantity).trim() === "") ? "1" : String(l.quantity).trim(),
+                unitCode: (l.unitCode || "").trim(),
+                unitPrice: priceNum.toFixed(2),
+                net: netNum.toFixed(2),
+                taxCategory: category,
+                rate: writtenRate
+            };
+        });
+
+        // Group lines into tax subtotals by (category, written rate).
+        var byKey = {}, order = [];
+        lines.forEach(function (ln) {
+            var key = ln.taxCategory + "|" + ln.rate;
+            if (!byKey[key]) { byKey[key] = { category: ln.taxCategory, rate: ln.rate, taxableNum: 0 }; order.push(key); }
+            byKey[key].taxableNum += parseFloat(ln.net);
+        });
+        var taxGroups = order.map(function (key) {
+            var g = byKey[key];
+            var taxable = roundNum(g.taxableNum);
+            var isStandard = g.category === "S";
+            var rateNum = isStandard && isFinite(parseFloat(g.rate)) ? parseFloat(g.rate) : 0;
+            var tax = roundNum(taxable * rateNum / 100);
+            return { category: g.category, rate: g.rate, taxable: taxable.toFixed(2), tax: tax.toFixed(2) };
+        });
+
+        var lineExtNum = lines.reduce(function (a, ln) { return a + parseFloat(ln.net); }, 0);
+        var taxNum = taxGroups.reduce(function (a, g) { return a + parseFloat(g.tax); }, 0);
+        var net = lines.length ? roundNum(lineExtNum).toFixed(2) : "";
+        var tax = lines.length ? roundNum(taxNum).toFixed(2) : "";
+        var gross = lines.length ? roundNum(lineExtNum + taxNum).toFixed(2) : "";
+
         var payable = resolvePayable(s, gross, settings.payableHandling);
+
+        // Aggregates for the single-line / legacy code path.
+        var firstCat = lines.length ? lines[0].taxCategory : (s.taxCategory || "S");
+        var firstRate = lines.length ? lines[0].rate : (firstCat === "S" ? (s.taxRate || "") : "0");
 
         return {
             scenarioNumber: s.scenarioNumber.trim(),
@@ -417,14 +459,20 @@ PUG.app = (function () {
             docLabel: dt.label,
             direction: s.direction === "GLOBAL" ? getGlobalDirection() : s.direction,
             country: country,
-            // best-effort monetary inputs
+            // best-effort monetary inputs (aggregate)
             net: net,
             tax: tax,
             gross: gross,
             payable: payable,
-            taxRate: writtenRate,
-            taxCategory: category,
-            taxExemptionReason: isStandard ? "" : (s.taxExemptionReason || "").trim(),
+            taxRate: firstRate,
+            taxCategory: firstCat,
+            taxExemptionReason: (firstCat === "S") ? "" : docExemption,
+            // multi-line model (used by the generator's line rebuild)
+            lines: lines.map(function (ln, i) {
+                return { id: i + 1, name: ln.name, description: ln.description, quantity: ln.quantity, unitCode: ln.unitCode, unitPrice: ln.unitPrice, net: ln.net, taxCategory: ln.taxCategory, rate: ln.rate };
+            }),
+            taxGroups: taxGroups,
+            docExemptionReason: docExemption,
             originalInvoiceRef: s.docType === "CREDIT_NOTE" ? (s.originalInvoiceRef || "").trim() : "",
             fillTaxTotals: settings.fillTaxTotals,
             keepTemplatePayable: settings.payableHandling === "KEEP_TEMPLATE",

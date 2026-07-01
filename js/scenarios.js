@@ -75,9 +75,30 @@ PUG.scenarios = (function () {
             taxCategory: "S",
             taxExemptionReason: "",
             originalInvoiceRef: "",
+            lines: [newLine()],
             seller: newParty(),
             buyer: newParty()
         };
+    }
+
+    function newLine() {
+        var gc = globalCountry();
+        return {
+            name: "", description: "", quantity: "1", unitCode: "",
+            unitPrice: "", taxCategory: "S", rate: PUG_DATA.defaultTaxRateFor(gc)
+        };
+    }
+
+    // Guarantee at least one line, and seed a line from a legacy single "amount"
+    // (e.g. a scenario produced by import) so it appears as an editable line.
+    function ensureLines(s) {
+        if (!s.lines || !s.lines.length) s.lines = [newLine()];
+        var anyPrice = s.lines.some(function (l) { return l && String(l.unitPrice == null ? "" : l.unitPrice).trim() !== ""; });
+        if (!anyPrice && s.amount != null && String(s.amount).trim() !== "") {
+            s.lines[0].unitPrice = s.amount;
+            if (s.taxRate) s.lines[0].rate = s.taxRate;
+            if (s.taxCategory) s.lines[0].taxCategory = s.taxCategory;
+        }
     }
 
     function newParty() {
@@ -138,16 +159,28 @@ PUG.scenarios = (function () {
         tr.appendChild(tdText(directionLabel(s)));
         tr.appendChild(tdText(docTypeLabel(s.docType)));
         tr.appendChild(tdText(s.issueDate || "—"));
-        tr.appendChild(tdText(s.amount || "—"));
+        tr.appendChild(tdText(displayAmount(s)));
         tr.appendChild(tdText(partySummary(s)));
 
         var actions = el("div", { class: "row-actions" });
         actions.appendChild(button("Edit", "btn btn--small", function () { openEditor("edit", s.id); }));
+        actions.appendChild(button("Duplicate", "btn btn--small btn--ghost", function () { duplicateScenario(s.id); }));
         var del = button("✕", "btn btn--small btn--ghost", function () { removeScenario(s.id); });
         del.setAttribute("title", "Remove scenario");
         actions.appendChild(del);
         tr.appendChild(cell(actions, "actions-cell"));
         return tr;
+    }
+
+    // Deep-copy a committed scenario into a new editable row just below it.
+    function duplicateScenario(id) {
+        var idx = scenarios.findIndex(function (s) { return s.id === id; });
+        if (idx < 0) return;
+        var copy = cloneScenario(scenarios[idx]);
+        copy.id = util.uid("s");
+        if (copy.scenarioNumber && copy.scenarioNumber.trim()) copy.scenarioNumber = copy.scenarioNumber + " (copy)";
+        scenarios.splice(idx + 1, 0, copy);
+        render();
     }
 
     function directionLabel(s) {
@@ -164,6 +197,20 @@ PUG.scenarios = (function () {
         return sName + " → " + bName;
     }
 
+    // Sum of line nets for the scenario table (falls back to a legacy amount).
+    function displayAmount(s) {
+        var lines = (s && s.lines) || [];
+        var total = 0, any = false;
+        lines.forEach(function (l) {
+            var p = parseFloat(util.normaliseAmount(l.unitPrice));
+            if (!isFinite(p)) return;
+            var q = parseFloat(l.quantity); if (!isFinite(q)) q = 1;
+            total += q * p; any = true;
+        });
+        if (any) return total.toFixed(2);
+        return (s && s.amount && String(s.amount).trim()) ? s.amount : "—";
+    }
+
     /* -------------------------------- editor ------------------------------ */
 
     function openEditor(mode, id) {
@@ -172,6 +219,7 @@ PUG.scenarios = (function () {
         working = mode === "edit"
             ? cloneScenario(scenarios.find(function (s) { return s.id === id; }))
             : newScenario();
+        ensureLines(working);
         showEditor(mode === "edit" ? "Edit scenario" : "Add scenario",
             mode === "edit" ? "Save changes" : "Add scenario");
     }
@@ -181,6 +229,7 @@ PUG.scenarios = (function () {
         editMode = "add";
         editId = null;
         working = scenarioData;
+        ensureLines(working);
         showEditor("Add scenario (imported)", "Add scenario");
     }
 
@@ -223,6 +272,7 @@ PUG.scenarios = (function () {
         editorIssuesEl = el("div", { class: "issues-panel", hidden: "hidden" });
         body.appendChild(editorIssuesEl);
         body.appendChild(documentSection(s));
+        body.appendChild(linesSection(s));
         body.appendChild(partiesSection(s));
         if (!body._issuesBound) {
             body.addEventListener("input", function () { renderIssues(working); });
@@ -283,34 +333,77 @@ PUG.scenarios = (function () {
 
         grid.appendChild(field("Currency", textInput(s.currency, "EUR (used if blank)", function (v) { s.currency = v; })));
         grid.appendChild(field("Issue date", textInput(s.issueDate, "YYYY-MM-DD", function (v) { s.issueDate = v; })));
-        grid.appendChild(field("Amount (net, excl. tax)", textInput(s.amount, "0.00", function (v) { s.amount = v; })));
-        grid.appendChild(field("Tax rate (%)", textInput(s.taxRate, "e.g. 25", function (v) { s.taxRate = v; })));
 
-        // Conditional field: only when tax category is not standard.
+        // Document-level tax exemption reason (used for reverse-charge / exempt lines).
         var exemptionField = field("Tax exemption reason", textInput(s.taxExemptionReason, "e.g. Reverse charge — Article 196", function (v) { s.taxExemptionReason = v; }));
-
-        grid.appendChild(field("Tax category", select([
-            { value: "S", label: "S — Standard rate" },
-            { value: "Z", label: "Z — Zero rated" },
-            { value: "E", label: "E — Exempt" },
-            { value: "AE", label: "AE — Reverse charge" },
-            { value: "K", label: "K — Intra-community" },
-            { value: "G", label: "G — Export (outside EU)" },
-            { value: "O", label: "O — Outside scope of VAT" }
-        ], s.taxCategory || "S", function (v) {
-            s.taxCategory = v;
-            toggle(exemptionField, v !== "S");
-        })));
 
         grid.appendChild(field("Payable", textInput(s.payableAmount, "(defaults to total incl. tax)", function (v) { s.payableAmount = v; })));
 
         grid.appendChild(exemptionField);
         grid.appendChild(billingField);
-        toggle(exemptionField, (s.taxCategory || "S") !== "S");
         toggle(billingField, s.docType === "CREDIT_NOTE");
 
         box.appendChild(grid);
         return box;
+    }
+
+    /* -------------------------------- lines ------------------------------- */
+
+    var TAX_CATEGORY_OPTIONS = [
+        { value: "S", label: "S — Standard rate" },
+        { value: "Z", label: "Z — Zero rated" },
+        { value: "E", label: "E — Exempt" },
+        { value: "AE", label: "AE — Reverse charge" },
+        { value: "K", label: "K — Intra-community" },
+        { value: "G", label: "G — Export (outside EU)" },
+        { value: "O", label: "O — Outside scope of VAT" }
+    ];
+
+    function linesSection(s) {
+        if (!s.lines || !s.lines.length) s.lines = [newLine()];
+        var box = el("div", { class: "editor-section" });
+        box.appendChild(elText("h3", "Lines", "editor-section__title"));
+        var host = el("div", { class: "lines-host" });
+        box.appendChild(host);
+        var add = button("+ Add line", "btn btn--secondary btn--small", function () {
+            s.lines.push(newLine());
+            renderLines(s, host);
+            renderIssues(working);
+        });
+        box.appendChild(add);
+        renderLines(s, host);
+        return box;
+    }
+
+    function renderLines(s, host) {
+        host.innerHTML = "";
+        s.lines.forEach(function (line, i) { host.appendChild(lineRow(s, line, i, host)); });
+    }
+
+    function lineRow(s, line, index, host) {
+        var row = el("div", { class: "line-row" });
+
+        var head = el("div", { class: "line-row__head" });
+        head.appendChild(elText("span", "Line " + (index + 1), "line-row__title"));
+        var rm = button("✕", "btn btn--small btn--ghost", function () {
+            s.lines.splice(index, 1);
+            if (!s.lines.length) s.lines.push(newLine());
+            renderLines(s, host);
+            renderIssues(working);
+        });
+        rm.setAttribute("title", "Remove line");
+        head.appendChild(rm);
+        row.appendChild(head);
+
+        var grid = el("div", { class: "editor-grid" });
+        grid.appendChild(field("Item name", textInput(line.name, "Item name", function (v) { line.name = v; })));
+        grid.appendChild(field("Description", textInput(line.description, "Optional", function (v) { line.description = v; })));
+        grid.appendChild(field("Quantity", textInput(line.quantity, "1", function (v) { line.quantity = v; })));
+        grid.appendChild(field("Unit price (net)", textInput(line.unitPrice, "0.00", function (v) { line.unitPrice = v; })));
+        grid.appendChild(field("Tax category", select(TAX_CATEGORY_OPTIONS, line.taxCategory || "S", function (v) { line.taxCategory = v; renderIssues(working); })));
+        grid.appendChild(field("Rate (%)", textInput(line.rate, "e.g. 20", function (v) { line.rate = v; })));
+        row.appendChild(grid);
+        return row;
     }
 
     function toggle(node, show) {
