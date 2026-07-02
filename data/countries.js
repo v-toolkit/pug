@@ -99,7 +99,35 @@ PUG_DATA.countries = [
             { key: "siren", label: "SIREN", hint: "9-digit legal registration identifier", example: "987654321", slots: ["legalEntityCompanyId"], schemeID: "0002" },
             { key: "vat", label: "VAT number", hint: "FR + 11 characters", example: "FR12987654321", slots: ["taxScheme"], taxScheme: "VAT" },
             { key: "endpoint", label: "E-invoicing address (Annuaire)", hint: "Scheme 0225 — SIREN or SIREN_SIRET", example: "987654321", slots: ["endpointId"], schemeID: "0225" }
-        ]
+        ],
+        profile: {
+            businessProcesses: [
+                { code: "B1", label: "B1 — Goods" },
+                { code: "B2", label: "B2 — Goods (additional case)" },
+                { code: "B7", label: "B7 — Goods (specific case)" },
+                { code: "S1", label: "S1 — Services" },
+                { code: "S2", label: "S2 — Services (additional case)" },
+                { code: "S4", label: "S4 — Services (specific case)" },
+                { code: "S5", label: "S5 — Subcontracting" },
+                { code: "S6", label: "S6 — Co-contracting" },
+                { code: "S7", label: "S7 — Services (specific case)" },
+                { code: "M1", label: "M1 — Mixed goods & services" }
+            ],
+            barValues: ["B2B", "B2BINT", "B2C", "OUTOFSCOPE", "ARCHIVEONLY"],
+            contexts: [
+                { code: "DOMESTIC", label: "Domestic (FR → FR)", bar: "B2B" },
+                { code: "CROSSBORDER", label: "Cross-border B2B", bar: "B2BINT" },
+                { code: "B2C", label: "B2C (consumer)", bar: "B2C" }
+            ],
+            noteCodes: [
+                { code: "REG", label: "Legal form / share capital (#REG#)", example: "SARL au capital de 100000.00 EUR" },
+                { code: "ABL", label: "RCS registration (#ABL#)", example: "RCS Lyon B 987 654 321" },
+                { code: "AAI", label: "APE / NAF activity (#AAI#)", example: "APE 4651Z - Commerce de gros" },
+                { code: "PMD", label: "Late-payment penalties (#PMD#)", example: "Pénalités de retard: taux BCE + 10 points" },
+                { code: "PMT", label: "Recovery indemnity (#PMT#)", example: "Indemnité forfaitaire de recouvrement: 40 EUR" },
+                { code: "AAB", label: "Early-payment discount terms (#AAB#)", example: "Pas d'escompte pour paiement anticipé" }
+            ]
+        }
     },
     {
         code: "DE", name: "Germany", folder: "germany",
@@ -289,6 +317,11 @@ PUG_DATA.countriesByCode = PUG_DATA.countries.reduce(function (map, country) {
 PUG_DATA.getCountryIdentifiers = function (code) {
     var country = PUG_DATA.countriesByCode[(code || "").toUpperCase()];
     return country ? country.identifiers : PUG_DATA.defaultIdentifiers;
+};
+
+PUG_DATA.getCountryProfile = function (code) {
+    var country = PUG_DATA.countriesByCode[(code || "").toUpperCase()];
+    return country && country.profile ? country.profile : null;
 };
 
 // The ISO 3166-1 alpha-2 country code to write into the XML. Usually the same

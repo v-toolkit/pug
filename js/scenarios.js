@@ -65,6 +65,8 @@ PUG.scenarios = (function () {
         return {
             id: util.uid("s"),
             scenarioNumber: "",
+            template: "",
+            country: "",
             direction: "GLOBAL",
             docType: "INVOICE",
             currency: PUG_DATA.defaultCurrencyFor(gc),
@@ -75,6 +77,9 @@ PUG.scenarios = (function () {
             taxCategory: "S",
             taxExemptionReason: "",
             originalInvoiceRef: "",
+            invoicingContext: "DOMESTIC",
+            businessProcess: "B1",
+            notes: [],
             lines: [newLine()],
             seller: newParty(),
             buyer: newParty()
@@ -112,6 +117,7 @@ PUG.scenarios = (function () {
     function cloneScenario(s) { return JSON.parse(JSON.stringify(s)); }
 
     function globalCountry() { return (PUG.app && PUG.app.getGlobalCountry) ? PUG.app.getGlobalCountry() : ""; }
+    function scenarioCountry() { return (working && working.country) ? working.country : globalCountry(); }
     function globalDirection() { return (PUG.app && PUG.app.getGlobalDirection) ? PUG.app.getGlobalDirection() : "AR"; }
     function resolveDirection(s) { return s.direction === "GLOBAL" ? globalDirection() : s.direction; }
 
@@ -271,7 +277,9 @@ PUG.scenarios = (function () {
         body.innerHTML = "";
         editorIssuesEl = el("div", { class: "issues-panel", hidden: "hidden" });
         body.appendChild(editorIssuesEl);
+        body.appendChild(templateSection(s));
         body.appendChild(documentSection(s));
+        if (scenarioCountry() === "FR") body.appendChild(franceSection(s));
         body.appendChild(linesSection(s));
         body.appendChild(partiesSection(s));
         if (!body._issuesBound) {
@@ -305,6 +313,57 @@ PUG.scenarios = (function () {
             var li = el("li"); li.textContent = msg; ul.appendChild(li);
         });
         box.appendChild(ul);
+        return box;
+    }
+
+    function templateSection(s) {
+        var box = el("div", { class: "editor-section" });
+        box.appendChild(elText("h3", "Template", "editor-section__title"));
+
+        var srcLabel = el("div", { class: "readonly-value" });
+        srcLabel.textContent = (s.template && s.template.trim())
+            ? "This scenario has its own example template."
+            : "Using the Setup template.";
+        box.appendChild(srcLabel);
+
+        var code = scenarioCountry();
+        var country = (code && PUG_DATA.countriesByCode[code]) ? PUG_DATA.countriesByCode[code] : null;
+        var folder = country ? country.folder : "";
+
+        if (PUG.examples && PUG.examples.available() && folder) {
+            box.appendChild(fieldLabel("Swap to another " + (country ? country.name : code) + " example (keeps your values)"));
+            var controls = el("div", { class: "example-host__controls" });
+            var sel = el("select", { class: "field example-select" });
+            var status = el("p", { class: "field-hint" });
+            var useBtn = button("Use this example", "btn btn--ghost", function () {
+                if (!sel._entries || !sel._entries.length) return;
+                var e = sel._entries[parseInt(sel.value, 10) || 0];
+                if (!e) return;
+                status.textContent = "Loading " + e.label + "…";
+                PUG.examples.fetchText(e.href).then(function (xml) {
+                    s.template = xml;
+                    s.country = code;
+                    buildEditorBody(s); // rebuild; values live on the scenario, so they persist
+                }).catch(function (err) {
+                    status.textContent = "Couldn't fetch that example (" + ((err && err.message) || "network") + ").";
+                });
+            });
+            controls.appendChild(sel);
+            controls.appendChild(useBtn);
+            box.appendChild(controls);
+            box.appendChild(status);
+            PUG.examples.forFolder(folder).then(function (entries) {
+                sel.innerHTML = "";
+                (entries || []).forEach(function (e, i) {
+                    var o = el("option", { value: String(i) });
+                    o.textContent = e.label + (e.kind === "creditnote" ? " — credit note" : "");
+                    sel.appendChild(o);
+                });
+                sel._entries = entries || [];
+            }).catch(function () { });
+        } else {
+            box.appendChild(elText("p", "Load examples from Setup (needs to be online). Offline, this scenario uses the Setup template.", "field-hint"));
+        }
         return box;
     }
 
@@ -406,6 +465,70 @@ PUG.scenarios = (function () {
         return row;
     }
 
+    /* --------------------------- France profile --------------------------- */
+
+    function franceProfile() { return PUG_DATA.getCountryProfile("FR"); }
+
+    function frNoteValue(s, code) {
+        var n = (s.notes || []).filter(function (x) { return x.code === code; })[0];
+        return n ? n.value : "";
+    }
+    function frSetNote(s, code, value) {
+        s.notes = s.notes || [];
+        var existing = null;
+        s.notes.forEach(function (x) { if (x.code === code) existing = x; });
+        if (value == null || String(value).trim() === "") {
+            if (existing) s.notes = s.notes.filter(function (x) { return x !== existing; });
+            return;
+        }
+        if (existing) existing.value = value; else s.notes.push({ code: code, value: value });
+    }
+    function frBarFor(profile, ctxCode) {
+        var ctx = profile.contexts.filter(function (c) { return c.code === ctxCode; })[0] || profile.contexts[0];
+        return ctx.bar;
+    }
+    function ensureFrance(s) {
+        var profile = franceProfile(); if (!profile) return;
+        if (!s.invoicingContext) s.invoicingContext = profile.contexts[0].code;
+        if (!s.businessProcess) s.businessProcess = profile.businessProcesses[0].code;
+        if (frNoteValue(s, "BAR") === "") frSetNote(s, "BAR", frBarFor(profile, s.invoicingContext));
+    }
+
+    function franceSection(s) {
+        var profile = franceProfile();
+        if (!profile) return el("div", { hidden: "hidden" });
+        ensureFrance(s);
+
+        var box = el("div", { class: "editor-section" });
+        box.appendChild(elText("h3", "France — invoicing details", "editor-section__title"));
+
+        var grid = el("div", { class: "editor-grid" });
+        var notesHost = el("div", { class: "editor-grid" });
+
+        grid.appendChild(field("Invoicing context", select(profile.contexts.map(function (c) { return { value: c.code, label: c.label }; }), s.invoicingContext, function (v) {
+            s.invoicingContext = v;
+            frSetNote(s, "BAR", frBarFor(profile, v));
+            renderFranceNotes(s, profile, notesHost);
+            renderIssues(working);
+        }), "Sets the mandatory #BAR# treatment code."));
+
+        grid.appendChild(field("Business process (@name)", select(profile.businessProcesses.map(function (b) { return { value: b.code, label: b.label }; }), s.businessProcess, function (v) { s.businessProcess = v; }), "Written as name=\"…\" on the type code."));
+
+        box.appendChild(grid);
+        box.appendChild(elText("h4", "French notes (#…#) — leave blank to keep the template's", "editor-section__title"));
+        box.appendChild(notesHost);
+        renderFranceNotes(s, profile, notesHost);
+        return box;
+    }
+
+    function renderFranceNotes(s, profile, host) {
+        host.innerHTML = "";
+        host.appendChild(field("#BAR# treatment code", select(profile.barValues.map(function (v) { return { value: v, label: v }; }), frNoteValue(s, "BAR") || frBarFor(profile, s.invoicingContext), function (v) { frSetNote(s, "BAR", v); })));
+        profile.noteCodes.forEach(function (nc) {
+            host.appendChild(field(nc.label, textInput(frNoteValue(s, nc.code), nc.example || "", function (v) { frSetNote(s, nc.code, v); })));
+        });
+    }
+
     function toggle(node, show) {
         if (show) node.removeAttribute("hidden");
         else node.setAttribute("hidden", "hidden");
@@ -414,7 +537,7 @@ PUG.scenarios = (function () {
     // Read-only country, taken from the global Setup section.
     function countryField() {
         var box = el("div", { class: "editor-field" });
-        box.appendChild(fieldLabel("Country (from Setup)"));
+        box.appendChild(fieldLabel("Country (from template / Setup)"));
         countryDisplayEl = el("div", { class: "readonly-value" });
         countryDisplayEl.textContent = countryText();
         box.appendChild(countryDisplayEl);
@@ -422,7 +545,7 @@ PUG.scenarios = (function () {
     }
 
     function countryText() {
-        var code = globalCountry();
+        var code = scenarioCountry();
         if (!code) return "Not set — choose a country in Setup above";
         var c = PUG_DATA.countriesByCode[code];
         return c ? c.name + " (" + code + ")" : code;
@@ -494,7 +617,7 @@ PUG.scenarios = (function () {
 
     function identifiers(party) {
         var host = el("div", { class: "id-host" });
-        var code = globalCountry();
+        var code = scenarioCountry();
         var defs = PUG_DATA.getCountryIdentifiers(code);
 
         var title = el("div", { class: "id-host__title" });

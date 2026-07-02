@@ -183,6 +183,8 @@ PUG.xml = (function () {
         if (s.currency) xml = replaceInHeader(xml, "DocumentCurrencyCode", esc(s.currency));
         xml = replaceFirstTagValue(xml, "InvoiceTypeCode", esc(s.typeCode));
         xml = replaceFirstTagValue(xml, "CreditNoteTypeCode", esc(s.typeCode));
+        if (s.businessProcess) xml = setTypeCodeName(xml, s.businessProcess);
+        xml = applyNotes(xml, s);
 
         // Update the existing party blocks in place (preserves anything we did
         // not model, such as PUF extensions).
@@ -355,6 +357,42 @@ PUG.xml = (function () {
         inner = withinBlock(inner, "Price", function (p) { return replaceFirstTagValue(p, "PriceAmount", s.net); });
         inner = setTaxCategories(inner, s);
         return inner;
+    }
+
+    // Set the business-process code as name="…" on the (first) type-code element.
+    function setTypeCodeName(xml, name) {
+        return xml.replace(/(<(?:[\w.-]+:)?(?:Invoice|CreditNote)TypeCode)((?:\s[^>]*)?)(>)/, function (m, open, attrs, gt) {
+            if (/\sname="/.test(attrs)) attrs = attrs.replace(/\sname="[^"]*"/, ' name="' + name + '"');
+            else attrs = attrs + ' name="' + name + '"';
+            return open + attrs + gt;
+        });
+    }
+
+    // Upsert French coded notes (#CODE#value); append any free-text notes.
+    function applyNotes(xml, s) {
+        var notes = s.notes || [];
+        notes.forEach(function (n) {
+            var val = (n.value == null) ? "" : String(n.value);
+            if (val === "") return;
+            if (n.code) {
+                var content = "#" + n.code + "#" + val;
+                var re = new RegExp("(<(?:[\\w.-]+:)?Note>)#" + util.escapeRegExp(n.code) + "#[\\s\\S]*?(<\\/(?:[\\w.-]+:)?Note>)");
+                if (re.test(xml)) xml = xml.replace(re, function (m, a, b) { return a + esc(content) + b; });
+                else xml = injectNote(xml, esc(content));
+            } else {
+                xml = injectNote(xml, esc(val));
+            }
+        });
+        return xml;
+    }
+
+    function injectNote(xml, content) {
+        var note = "<cbc:Note>" + content + "</cbc:Note>";
+        var afterType = /(<\/(?:[\w.-]+:)?(?:CreditNoteTypeCode|InvoiceTypeCode)>)/;
+        if (afterType.test(xml)) return xml.replace(afterType, function (m, a) { return a + "\n    " + note; });
+        var beforeCurrency = /(<(?:[\w.-]+:)?DocumentCurrencyCode>)/;
+        if (beforeCurrency.test(xml)) return xml.replace(beforeCurrency, function (m, a) { return note + "\n    " + a; });
+        return xml;
     }
 
     function applyBillingReference(xml, s) {
@@ -709,6 +747,41 @@ PUG.xml = (function () {
         var amount = textOf(findFirst(total, "TaxInclusiveAmount")) || textOf(findFirst(total, "PayableAmount"));
         var payable = textOf(findFirst(total, "PayableAmount"));
 
+        // Invoice / credit-note lines (best-effort — used to seed the editor).
+        var lineLocal = docType === "CREDIT_NOTE" ? "CreditNoteLine" : "InvoiceLine";
+        var qtyLocal = docType === "CREDIT_NOTE" ? "CreditedQuantity" : "InvoicedQuantity";
+        var lines = findAll(root, lineLocal).map(function (le) {
+            var item = findFirst(le, "Item");
+            var qtyEl = findFirst(le, qtyLocal);
+            var cat = item ? findFirst(item, "ClassifiedTaxCategory") : null;
+            var priceEl = findFirst(le, "Price");
+            var price = priceEl ? textOf(findFirst(priceEl, "PriceAmount")) : "";
+            if (!price) price = textOf(findFirst(le, "LineExtensionAmount"));
+            return {
+                name: item ? textOf(findFirst(item, "Name")) : "",
+                description: item ? textOf(findFirst(item, "Description")) : "",
+                quantity: textOf(qtyEl) || "1",
+                unitCode: (qtyEl && qtyEl.getAttribute) ? (qtyEl.getAttribute("unitCode") || "") : "",
+                unitPrice: util.normaliseAmount(price),
+                taxCategory: cat ? (textOf(directChild(cat, "ID")) || "S") : "S",
+                rate: cat ? textOf(directChild(cat, "Percent")) : ""
+            };
+        });
+
+        // Business process (@name on the type code) + French coded notes (#CODE#value).
+        var typeEl = directChild(root, docType === "CREDIT_NOTE" ? "CreditNoteTypeCode" : "InvoiceTypeCode");
+        var businessProcess = (typeEl && typeEl.getAttribute) ? (typeEl.getAttribute("name") || "") : "";
+        var notes = [];
+        var invoicingContext = "";
+        var kids = root.children || [];
+        for (var i = 0; i < kids.length; i += 1) {
+            if (kids[i].localName !== "Note") continue;
+            var mm = /^#([A-Z0-9]+)#([\s\S]*)$/.exec(textOf(kids[i]));
+            if (!mm) continue;
+            notes.push({ code: mm[1], value: mm[2] });
+            if (mm[1] === "BAR") invoicingContext = mm[2] === "B2BINT" ? "CROSSBORDER" : (mm[2] === "B2C" ? "B2C" : "DOMESTIC");
+        }
+
         return {
             isPuf: isPuf,
             rootName: rootName,
@@ -719,6 +792,10 @@ PUG.xml = (function () {
             country: seller.country || buyer.country || "",
             amount: util.normaliseAmount(amount),
             payableAmount: util.normaliseAmount(payable),
+            lines: lines,
+            businessProcess: businessProcess,
+            notes: notes,
+            invoicingContext: invoicingContext,
             seller: seller,
             buyer: buyer
         };

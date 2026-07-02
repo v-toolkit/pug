@@ -66,6 +66,7 @@ PUG.app = (function () {
             var sel = byId("example-select");
             if (sel) loadExampleByIndex(parseInt(sel.value, 10) || 0);
         });
+        on("example-add-scenario", "click", addScenarioFromExample);
 
         // Settings modal (the editor modal is managed inside scenarios.js).
         on("settings-open", "click", function () { openModal(byId("settings-modal")); });
@@ -199,6 +200,32 @@ PUG.app = (function () {
 
     /* --------------------------- import from file ------------------------- */
 
+    // Build a fully-seeded scenario from an extracted example, carrying its own
+    // template + country + lines + France fields. Shared by file import and the
+    // "add scenario from example" flow.
+    function scenarioFromExtract(ex, templateText) {
+        var s = PUG.scenarios.newScenario();
+        s.template = templateText || "";
+        s.country = ex.country || getGlobalCountry() || "";
+        s.scenarioNumber = ex.scenarioNumber || s.scenarioNumber;
+        s.docType = ex.docType || "INVOICE";
+        s.currency = ex.currency || "";
+        s.issueDate = ex.issueDate || "";
+        s.amount = ex.amount || "";
+        s.payableAmount = ex.payableAmount || "";
+        if (ex.businessProcess) s.businessProcess = ex.businessProcess;
+        if (ex.invoicingContext) s.invoicingContext = ex.invoicingContext;
+        if (ex.notes && ex.notes.length) s.notes = ex.notes.map(function (n) { return { code: n.code, value: n.value }; });
+        if (ex.lines && ex.lines.length) {
+            s.lines = ex.lines.map(function (l) {
+                return { name: l.name || "", description: l.description || "", quantity: l.quantity || "1", unitCode: l.unitCode || "", unitPrice: l.unitPrice || "", taxCategory: l.taxCategory || "S", rate: l.rate || "" };
+            });
+        }
+        s.seller = mergeParty(s.seller, ex.seller);
+        s.buyer = mergeParty(s.buyer, ex.buyer);
+        return s;
+    }
+
     function importFromXml(text, name) {
         var doc, ex;
         try {
@@ -209,24 +236,33 @@ PUG.app = (function () {
             return;
         }
 
-        // The imported file becomes the global template, and sets the country.
+        // Also keep it as the Setup template default + reflect the country.
         var ta = byId("global-template");
         if (ta) ta.value = text;
         if (ex.country) setGlobalCountry(ex.country);
         else updateGlobalTemplateLink();
 
-        var s = PUG.scenarios.newScenario();
-        s.scenarioNumber = ex.scenarioNumber || s.scenarioNumber;
-        s.docType = ex.docType || "INVOICE";
-        s.currency = ex.currency || "";
-        s.issueDate = ex.issueDate || "";
-        s.amount = ex.amount || "";
-        s.payableAmount = ex.payableAmount || "";
-        s.seller = mergeParty(s.seller, ex.seller);
-        s.buyer = mergeParty(s.buyer, ex.buyer);
-
-        setupStatus("Loaded " + (name || "file") + " as the template" + (ex.country ? " (" + ex.country + ")" : "") + ". Review the scenario and add it.", "info");
+        var s = scenarioFromExtract(ex, text);
+        setupStatus("Loaded " + (name || "file") + " as a scenario" + (ex.country ? " (" + ex.country + ")" : "") + ". Review it and add it.", "info");
         PUG.scenarios.openEditorWith(s);
+    }
+
+    // Seed a brand-new scenario from the example currently chosen in the picker.
+    function addScenarioFromExample() {
+        var sel = byId("example-select");
+        if (!sel || !sel._entries || !sel._entries.length) { setupStatus("Pick a country with examples first.", "error"); return; }
+        var e = sel._entries[parseInt(sel.value, 10) || 0];
+        if (!e) return;
+        exampleStatus("Loading " + e.label + "…");
+        return PUG.examples.fetchText(e.href).then(function (text) {
+            var ex = PUG.xml.extractScenario(PUG.xml.parseXmlString(text));
+            if (!ex.country) ex.country = getGlobalCountry();
+            var s = scenarioFromExtract(ex, text);
+            exampleStatus("Added " + e.label + " as a scenario — edit and add it.", "ok");
+            PUG.scenarios.openEditorWith(s);
+        }).catch(function (err) {
+            exampleStatus("Couldn't fetch that example (" + ((err && err.message) || "network") + ").", "error");
+        });
     }
 
     function mergeParty(base, parsed) {
@@ -295,24 +331,27 @@ PUG.app = (function () {
         var list = PUG.scenarios.getScenarios();
         if (!list.length) { scenarioStatus("Add at least one scenario first.", "error"); return; }
 
-        var template = getGlobalTemplate();
-        if (!template || !template.trim()) {
-            scenarioStatus("Add a template in the Setup section first (the country example from GitHub).", "error");
+        var settings = getSettings();
+        var globalTpl = getGlobalTemplate();
+        function templateFor(s) { return (s.template && s.template.trim()) ? s.template : globalTpl; }
+
+        // Each scenario uses its own example template (or the Setup template as a
+        // fallback). Validate presence + root/document-type match per scenario.
+        var noTemplate = [], mismatched = [];
+        list.forEach(function (s) {
+            var tpl = templateFor(s);
+            if (!tpl || !tpl.trim()) { noTemplate.push(s.scenarioNumber || "(unnamed)"); return; }
+            var rt = PUG.validate.rootType(tpl);
+            if (!PUG.validate.rootMatchesDocType(rt, s.docType)) {
+                mismatched.push((s.scenarioNumber || "(unnamed)") + " needs " + (rt === "CREDIT_NOTE" ? "<CreditNote>" : "<Invoice>"));
+            }
+        });
+        if (noTemplate.length) {
+            scenarioStatus("No template for: " + noTemplate.join(", ") + ". Seed them from an example, or add a Setup template.", "error");
             return;
         }
-
-        var settings = getSettings();
-        var multiLine = (template.match(/<(?:[\w.-]+:)?(?:Invoice|CreditNote)Line\b/g) || []).length > 1;
-
-        // Structural guard: the template root (<Invoice>/<CreditNote>) can't be
-        // rewritten, so a scenario's document type must match it.
-        var rt = PUG.validate.rootType(template);
-        var rootLabel = rt === "CREDIT_NOTE" ? "<CreditNote>" : (rt === "INVOICE" ? "<Invoice>" : "the template");
-        var mismatched = list.filter(function (s) { return !PUG.validate.rootMatchesDocType(rt, s.docType); })
-            .map(function (s) { return s.scenarioNumber || "(unnamed)"; });
         if (mismatched.length) {
-            scenarioStatus("Template root is " + rootLabel + ", but these scenarios are the other document type: " +
-                mismatched.join(", ") + ". Use a matching template or change their document type.", "error");
+            scenarioStatus("Document type doesn't match the template root — " + mismatched.join("; ") + ". Change their document type or template.", "error");
             return;
         }
 
@@ -320,20 +359,19 @@ PUG.app = (function () {
         try {
             list.forEach(function (s) {
                 var prepared = prepareScenario(s, settings);
-                var xml = PUG.xml.generate(template, prepared);
+                var xml = PUG.xml.generate(templateFor(s), prepared);
                 generated.push({ filename: createFilename(prepared, settings.filenameMode), xml: xml, country: prepared.country });
             });
         } catch (err) {
             scenarioStatus("Generation failed: " + err.message, "error");
             return;
         }
+        var firstTpl = list.length ? templateFor(list[0]) : globalTpl;
 
         showPreview(generated);
         var failed = postGenerationChecks(generated);
         var notes = [];
-        if (!globalCountry) notes.push("no country set, identifiers may be generic");
-        if (multiLine) notes.push("template has multiple lines, so amounts/tax were left to the template");
-        var prof = PUG.validate.profileIssues(template);
+        var prof = PUG.validate.profileIssues(firstTpl);
         if (prof.length) notes.push(prof[0]);
         var msg = "Generated " + generated.length + " file(s). ";
         if (failed.length) {
@@ -390,7 +428,7 @@ PUG.app = (function () {
     function prepareScenario(s, settings) {
         var dt = PUG_DATA.getDocumentType(s.docType);
         var currency = (s.currency || settings.currency || "EUR").toUpperCase();
-        var country = (globalCountry || "").toUpperCase();
+        var country = ((s.country || globalCountry) || "").toUpperCase();
 
         var docExemption = (s.taxExemptionReason || "").trim();
 
@@ -451,6 +489,18 @@ PUG.app = (function () {
         var firstCat = lines.length ? lines[0].taxCategory : (s.taxCategory || "S");
         var firstRate = lines.length ? lines[0].rate : (firstCat === "S" ? (s.taxRate || "") : "0");
 
+        // France-specific document fields (business process + coded notes).
+        var isFrance = country === "FR";
+        var frBarMap = { DOMESTIC: "B2B", CROSSBORDER: "B2BINT", B2C: "B2C" };
+        var frNotes = [];
+        if (isFrance) {
+            frNotes = (s.notes || []).filter(function (n) { return n && n.value != null && String(n.value).trim() !== ""; })
+                .map(function (n) { return { code: (n.code || "").trim(), value: String(n.value) }; });
+            if (!frNotes.some(function (n) { return n.code === "BAR"; })) {
+                frNotes.push({ code: "BAR", value: frBarMap[s.invoicingContext] || "B2B" });
+            }
+        }
+
         return {
             scenarioNumber: s.scenarioNumber.trim(),
             issueDate: util.normaliseDate(s.issueDate),
@@ -474,6 +524,8 @@ PUG.app = (function () {
             taxGroups: taxGroups,
             docExemptionReason: docExemption,
             originalInvoiceRef: s.docType === "CREDIT_NOTE" ? (s.originalInvoiceRef || "").trim() : "",
+            businessProcess: isFrance ? (s.businessProcess || "B1") : "",
+            notes: frNotes,
             fillTaxTotals: settings.fillTaxTotals,
             keepTemplatePayable: settings.payableHandling === "KEEP_TEMPLATE",
             // placeholder-mode aliases
