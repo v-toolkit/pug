@@ -27,7 +27,7 @@ jobs:
         run: |
           mkdir -p _site
           cp index.html styles.css .nojekyll _site/
-          cp -r data js _site/
+          cp -r data js favicon _site/
 
       - name: Build examples manifest + copy examples (same-origin)
         run: node scripts/build-manifest.js --src reference/puf-billing --out _site/examples
