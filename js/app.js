@@ -203,10 +203,15 @@ PUG.app = (function () {
     // Build a fully-seeded scenario from an extracted example, carrying its own
     // template + country + lines + France fields. Shared by file import and the
     // "add scenario from example" flow.
-    function scenarioFromExtract(ex, templateText) {
+    function scenarioFromExtract(ex, templateText, meta) {
         var s = PUG.scenarios.newScenario();
         s.template = templateText || "";
         s.country = ex.country || getGlobalCountry() || "";
+        if (meta) {
+            s.templateName = meta.label || "";
+            s.templateHref = meta.href || "";
+            s.templateFile = meta.file || "";
+        }
         s.scenarioNumber = ex.scenarioNumber || s.scenarioNumber;
         s.docType = ex.docType || "INVOICE";
         s.currency = ex.currency || "";
@@ -242,7 +247,7 @@ PUG.app = (function () {
         if (ex.country) setGlobalCountry(ex.country);
         else updateGlobalTemplateLink();
 
-        var s = scenarioFromExtract(ex, text);
+        var s = scenarioFromExtract(ex, text, { label: name || "Imported file" });
         setupStatus("Loaded " + (name || "file") + " as a scenario" + (ex.country ? " (" + ex.country + ")" : "") + ". Review it and add it.", "info");
         PUG.scenarios.openEditorWith(s);
     }
@@ -257,7 +262,7 @@ PUG.app = (function () {
         return PUG.examples.fetchText(e.href).then(function (text) {
             var ex = PUG.xml.extractScenario(PUG.xml.parseXmlString(text));
             if (!ex.country) ex.country = getGlobalCountry();
-            var s = scenarioFromExtract(ex, text);
+            var s = scenarioFromExtract(ex, text, { label: e.label, href: e.href, file: e.file });
             exampleStatus("Added " + e.label + " as a scenario — edit and add it.", "ok");
             PUG.scenarios.openEditorWith(s);
         }).catch(function (err) {

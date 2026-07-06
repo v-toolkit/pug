@@ -66,6 +66,9 @@ PUG.scenarios = (function () {
             id: util.uid("s"),
             scenarioNumber: "",
             template: "",
+            templateName: "",
+            templateHref: "",
+            templateFile: "",
             country: "",
             direction: "GLOBAL",
             docType: "INVOICE",
@@ -321,9 +324,9 @@ PUG.scenarios = (function () {
         box.appendChild(elText("h3", "Template", "editor-section__title"));
 
         var srcLabel = el("div", { class: "readonly-value" });
-        srcLabel.textContent = (s.template && s.template.trim())
-            ? "This scenario has its own example template."
-            : "Using the Setup template.";
+        srcLabel.textContent = s.templateName
+            ? ("Based on: " + s.templateName)
+            : ((s.template && s.template.trim()) ? "This scenario has its own template." : "Using the Setup template.");
         box.appendChild(srcLabel);
 
         var code = scenarioCountry();
@@ -343,6 +346,9 @@ PUG.scenarios = (function () {
                 PUG.examples.fetchText(e.href).then(function (xml) {
                     s.template = xml;
                     s.country = code;
+                    s.templateName = e.label;
+                    s.templateHref = e.href || "";
+                    s.templateFile = e.file || "";
                     buildEditorBody(s); // rebuild; values live on the scenario, so they persist
                 }).catch(function (err) {
                     status.textContent = "Couldn't fetch that example (" + ((err && err.message) || "network") + ").";
@@ -353,18 +359,44 @@ PUG.scenarios = (function () {
             box.appendChild(controls);
             box.appendChild(status);
             PUG.examples.forFolder(folder).then(function (entries) {
+                entries = entries || [];
                 sel.innerHTML = "";
-                (entries || []).forEach(function (e, i) {
+                entries.forEach(function (e, i) {
                     var o = el("option", { value: String(i) });
                     o.textContent = e.label + (e.kind === "creditnote" ? " — credit note" : "");
                     sel.appendChild(o);
                 });
-                sel._entries = entries || [];
+                sel._entries = entries;
+                // Reflect the scenario's current example so the dropdown doesn't
+                // snap back to the first option after a rebuild.
+                var idx = matchExampleIndex(entries, s);
+                if (idx < 0 && !(s.template && s.template.trim())) {
+                    // No per-scenario template yet: reflect the Setup-selected
+                    // example — the template this scenario falls back to at
+                    // generation — instead of defaulting to the first option.
+                    var setupSel = document.getElementById("example-select");
+                    var sidx = (setupSel && setupSel.value !== "") ? parseInt(setupSel.value, 10) : -1;
+                    if (sidx >= 0 && sidx < entries.length) {
+                        idx = sidx;
+                        srcLabel.textContent = "Using the Setup template: " + entries[idx].label;
+                    }
+                }
+                if (idx >= 0 && idx < entries.length) sel.value = String(idx);
             }).catch(function () { });
         } else {
             box.appendChild(elText("p", "Load examples from Setup (needs to be online). Offline, this scenario uses the Setup template.", "field-hint"));
         }
         return box;
+    }
+
+    // Which manifest entry is this scenario currently based on? Match by href,
+    // then file, then label. Returns -1 when the template isn't a known example.
+    function matchExampleIndex(entries, s) {
+        var i;
+        for (i = 0; i < entries.length; i += 1) { if (s.templateHref && entries[i].href === s.templateHref) return i; }
+        for (i = 0; i < entries.length; i += 1) { if (s.templateFile && entries[i].file === s.templateFile) return i; }
+        for (i = 0; i < entries.length; i += 1) { if (s.templateName && entries[i].label === s.templateName) return i; }
+        return -1;
     }
 
     function documentSection(s) {
